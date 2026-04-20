@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>分词 (Tokenization) - MiniMind 学习</title>
+    <link rel="stylesheet" href="styles/common.css">
+    <style>
+        /* 分词页面特定样式 */
+        .tokens-demo {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: center;
+            margin: 25px 0;
+        }
+
+        .token-box {
+            background: linear-gradient(135deg, #2d3748, #1a202c);
+            padding: 15px 25px;
+            border-radius: 12px;
+            border: 2px solid transparent;
+            transition: all 0.3s;
+            text-align: center;
+        }
+
+        .token-box.highlight {
+            border-color: #00d4ff;
+            transform: scale(1.1);
+            box-shadow: 0 0 25px rgba(0, 212, 255, 0.4);
+        }
+
+        .token-text {
+            font-size: 1.3em;
+            font-weight: bold;
+            color: #fff;
+        }
+
+        .token-id {
+            font-size: 0.85em;
+            color: #888;
+            margin-top: 5px;
+        }
+
+        .bpe-viz {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+            flex-wrap: wrap;
+            margin: 20px 0;
+            padding: 20px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 12px;
+        }
+
+        .bpe-char {
+            display: inline-block;
+            padding: 8px 12px;
+            background: #333;
+            border-radius: 6px;
+            font-size: 1.1em;
+        }
+
+        .bpe-char.combine {
+            background: #00d4ff;
+            color: #000;
+            font-weight: bold;
+            animation: pulse 0.5s ease;
+        }
+
+        .vocab-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+            gap: 10px;
+            margin: 20px 0;
+        }
+
+        .vocab-item {
+            background: #2a2a3e;
+            padding: 12px;
+            border-radius: 8px;
+            text-align: center;
+            font-size: 0.9em;
+            transition: all 0.3s;
+        }
+
+        .vocab-item:hover {
+            background: #3a3a4e;
+        }
+
+        .process-steps {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            margin: 30px 0;
+            flex-wrap: wrap;
+        }
+
+        .process-step {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .step-circle {
+            width: 50px;
+            height: 50px;
+            background: linear-gradient(135deg, #00d4ff, #7c3aed);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 1.2em;
+        }
+
+        .step-label {
+            font-size: 0.9em;
+            color: #888;
+        }
+    </style>
+</head>
+<body>
+    <!-- 导航栏 -->
+    <nav class="navbar">
+        <div class="container">
+            <a href="index.html" class="logo">
+                <div class="logo-icon">🧠</div>
+                <span>MiniMind 学习</span>
+            </a>
+            <div class="nav-links">
+                <a href="index.html" class="nav-link">首页</a>
+                <a href="tokenization.html" class="nav-link active">分词</a>
+                <a href="embedding.html" class="nav-link">词嵌入</a>
+                <a href="position.html" class="nav-link">位置编码</a>
+                <a href="attention.html" class="nav-link">注意力</a>
+                <a href="precision.html" class="nav-link">精度量化</a>
+                <a href="forward.html" class="nav-link">前馈网络</a>
+                <a href="model_architecture.html" class="nav-link">模型架构</a>
+                <a href="moe.html" class="nav-link">MoE</a>
+                <a href="pretrain.html" class="nav-link">预训练</a>
+                <a href="sft.html" class="nav-link">SFT</a>
+                <a href="lora.html" class="nav-link">LoRA</a>
+                <a href="dpo.html" class="nav-link">DPO</a>
+                <a href="grpo.html" class="nav-link">GRPO</a>
+                <a href="inference.html" class="nav-link">推理</a>
+                <a href="rag_retrieval.html" class="nav-link">RAG 检索</a>
+                <a href="rag_augment.html" class="nav-link">RAG 增强</a>
+                <a href="rag_generation.html" class="nav-link">RAG 生成</a>
+                <a href="rag_pipeline.html" class="nav-link">RAG 流程</a>
+                <a href="full_pipeline.html" class="nav-link" style="color: var(--accent);">全流程</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <!-- 页面标题 -->
+        <div class="page-header">
+            <h1 class="page-title">📝 分词 (Tokenization)</h1>
+            <p class="page-subtitle">计算机是如何"拆解"文字的？</p>
+        </div>
+
+        <!-- 核心概念 -->
+        <div class="content-card">
+            <h3>🎯 核心问题</h3>
+            <p>计算机只能处理数字，无法直接理解文字。那么，当我们输入 <strong>"今天天气很好"</strong> 时，计算机是怎么处理这些文字的呢？</p>
+
+            <div class="concept-box">
+                <div class="concept-title">💡 类比：拼积木</div>
+                <p>想象一下，你有一堆积木（词元），要把一句话拆成一个个小积木。每个积木就是一个 Token。</p>
+                <div class="analogy">
+                    <div class="analogy-title">🏠 生活类比</div>
+                    <p>句子 = 一句话<br>
+                    词元(Token) = 这句话中的每个"词"或"字"<br>
+                    分词 = 把句子拆成一个个小积木</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 分词演示 -->
+        <div class="content-card">
+            <h3>🎮 交互演示：分词过程</h3>
+            <p>尝试输入不同的句子，看看分词器是如何工作的：</p>
+
+            <div class="input-group">
+                <input type="text" id="inputSentence" class="input-field" placeholder="输入句子，如：今天天气很好" value="今天天气很好">
+                <button class="btn btn-primary" onclick="tokenize()">🔍 分词</button>
+            </div>
+
+            <div class="demo-area">
+                <h4>分词结果</h4>
+                <div class="tokens-demo" id="tokensResult">
+                    <!-- 动态生成 -->
+                </div>
+                <p style="color:#888; margin-top:15px;">Token IDs: <span id="tokenIds"></span></p>
+            </div>
+        </div>
+
+        <!-- BPE 算法解释 -->
+        <div class="content-card">
+            <h3>🔧 BPE 算法原理</h3>
+            <p>MiniMind 使用的是 <strong>BPE (Byte Pair Encoding)</strong> 算法，中文叫"字节对编码"。它的核心思想是：</p>
+            <ul style="color:#ccc; margin:15px 0; padding-left:20px; line-height:2;">
+                <li>把每个字符作为初始的词元</li>
+                <li>统计出现频率最高的字符对</li>
+                <li>把它们合并成一个新的词元</li>
+                <li>重复直到达到预设的词表大小</li>
+            </ul>
+
+            <div class="process-steps">
+                <div class="process-step">
+                    <div class="step-circle">1</div>
+                    <div class="step-label">字符拆分</div>
+                </div>
+                <div style="color:#00d4ff;">→</div>
+                <div class="process-step">
+                    <div class="step-circle">2</div>
+                    <div class="step-label">统计频率</div>
+                </div>
+                <div style="color:#00d4ff;">→</div>
+                <div class="process-step">
+                    <div class="step-circle">3</div>
+                    <div class="step-label">合并高频</div>
+                </div>
+                <div style="color:#00d4ff;">→</div>
+                <div class="process-step">
+                    <div class="step-circle">4</div>
+                    <div class="step-label">重复</div>
+                </div>
+            </div>
+
+            <div class="concept-box">
+                <div class="concept-title">📊 BPE 效果示例</div>
+                <p>原始句子："今天天气很好"</p>
+                <div class="bpe-viz" id="bpeViz">
+                    <span class="bpe-char">今</span>
+                    <span class="bpe-char">天</span>
+                    <span class="bpe-char">天</span>
+                    <span class="bpe-char">气</span>
+                    <span class="bpe-char">很</span>
+                    <span class="bpe-char">好</span>
+                </div>
+                <p style="margin-top:15px;">分词结果：[今天] [天气] [很] [好]</p>
+            </div>
+        </div>
+
+        <!-- 词表大小 -->
+        <div class="content-card">
+            <h3>📋 词表大小</h3>
+            <p>MiniMind 的词表大小是 <strong>6400</strong>，这意味着它可以把任意句子编码成 6400 以内的数字序列。</p>
+
+            <div style="display:flex; justify-content:center; gap:40px; margin:30px 0; flex-wrap:wrap;">
+                <div style="text-align:center;">
+                    <div style="font-size:3em; color:#00d4ff; font-weight:bold;">6400</div>
+                    <div style="color:#888;">词表大小</div>
+                </div>
+                <div style="text-align:center;">
+                    <div style="font-size:3em; color:#7c3aed; font-weight:bold;">BPE</div>
+                    <div style="color:#888;">分词算法</div>
+                </div>
+                <div style="text-align:center;">
+                    <div style="font-size:3em; color:#ffe66d; font-weight:bold;">中文</div>
+                    <div style="color:#888;">优化语种</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 多模态词表 -->
+        <div class="content-card">
+            <h3>🖼️ 多模态词表：不止是文字</h3>
+            <p>对于处理<strong>图像</strong>和<strong>音频</strong>的多模态模型，词表的构建方式更加复杂，需要为不同模态设计专门的编码方案。</p>
+
+            <div class="concept-box">
+                <div class="concept-title">1. 图像词表：VQ-VAE 方案</div>
+                <p>图像不能像文字一样直接分割，需要通过<strong>编码器+量化</strong>的方式将图像压缩到离散 token 空间：</p>
+                <ul style="color:#ccc; margin:10px 0; padding-left:20px; line-height:1.8;">
+                    <li>原图 (如 512×512) 通过 VAE Encoder 压缩 8 倍</li>
+                    <li>得到 64×64 的 latent 空间，每个位置是一个向量</li>
+                    <li>量化为 codebook 中的一个 code（词表 ID）</li>
+                    <li>整个图像变成一串 token IDs（类似文字分词）</li>
+                </ul>
+                <div style="background:#1a1a2e; padding:15px; border-radius:8px; margin-top:10px;">
+                    <div style="display:flex; align-items:center; gap:15px; justify-content:center; flex-wrap:wrap;">
+                        <div style="text-align:center;">
+                            <div style="font-size:0.9em; color:#888;">原图</div>
+                            <div style="background:#333; padding:15px 20px; border-radius:5px;">512×512 像素</div>
+                        </div>
+                        <div style="color:#00d4ff;">→</div>
+                        <div style="text-align:center;">
+                            <div style="font-size:0.9em; color:#888;">VAE 编码</div>
+                            <div style="background:#333; padding:15px 20px; border-radius:5px;">64×64 latent</div>
+                        </div>
+                        <div style="color:#00d4ff;">→</div>
+                        <div style="text-align:center;">
+                            <div style="font-size:0.9em; color:#888;">量化到词表</div>
+                            <div style="background:#333; padding:15px 20px; border-radius:5px;">[code] × 4096</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="concept-box">
+                <div class="concept-title">2. 音频词表：Encodec 方案</div>
+                <p>音频通过神经网络 Codec 将波形压缩到离散 token 序列：</p>
+                <ul style="color:#ccc; margin:10px 0; padding-left:20px; line-height:1.8;">
+                    <li>原始波形通过 Encodec Encoder</li>
+                    <li>输出多个码本（codebook）的 token 序列</li>
+                    <li>外层码本编码粗粒度，内层码本编码细粒度</li>
+                    <li>每帧生成 4 个 token（如 MusicGen）</li>
+                </ul>
+                <div style="background:#1a1a2e; padding:15px; border-radius:8px; margin-top:10px;">
+                    <div style="display:flex; align-items:center; gap:15px; justify-content:center; flex-wrap:wrap;">
+                        <div style="text-align:center;">
+                            <div style="font-size:0.9em; color:#888;">波形</div>
+                            <div style="background:#333; padding:15px 20px; border-radius:5px;">[采样点...]</div>
+                        </div>
+                        <div style="color:#00d4ff;">→</div>
+                        <div style="text-align:center;">
+                            <div style="font-size:0.9em; color:#888;">Encodec</div>
+                            <div style="background:#333; padding:15px 20px; border-radius:5px;">多码本 tokens</div>
+                        </div>
+                        <div style="color:#00d4ff;">→</div>
+                        <div style="text-align:center;">
+                            <div style="font-size:0.9em; color:#888;">词表 ID</div>
+                            <div style="background:#333; padding:15px 20px; border-radius:5px;">[1, 2048, 500, ...]</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="concept-box">
+                <div class="concept-title">3. 统一多模态词表</div>
+                <p>将文本、图像、音频的 tokens 整合到一个统一的词表中：</p>
+                <div style="background:#1a1a2e; padding:15px; border-radius:8px; margin-top:10px;">
+                    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:15px;">
+                        <div style="background:#2a2a3e; padding:12px; border-radius:6px; border-left:3px solid #00d4ff;">
+                            <div style="color:#00d4ff; font-weight:bold;">文本 Tokens</div>
+                            <div style="color:#888; font-size:0.85em;">[0, 1, 2, ..., 32000]</div>
+                            <div style="color:#666; font-size:0.8em; margin-top:5px;">与标准 LLM 兼容</div>
+                        </div>
+                        <div style="background:#2a2a3e; padding:12px; border-radius:6px; border-left:3px solid #7c3aed;">
+                            <div style="color:#7c3aed; font-weight:bold;">图像 Tokens</div>
+                            <div style="color:#888; font-size:0.85em;">[32001, ..., 50000]</div>
+                            <div style="color:#666; font-size:0.8em; margin-top:5px;">VQ-VAE codebook</div>
+                        </div>
+                        <div style="background:#2a2a3e; padding:12px; border-radius:6px; border-left:3px solid #10b981;">
+                            <div style="color:#10b981; font-weight:bold;">音频 Tokens</div>
+                            <div style="color:#888; font-size:0.85em;">[50001, ..., 60000]</div>
+                            <div style="color:#666; font-size:0.8em; margin-top:5px;">Encodec 码本</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="formula">
+                多模态词表 = 文本 BPE 词表 + 图像 Codebook + 音频 Codec 码本
+            </div>
+        </div>
+
+        <!-- 代码示例 -->
+        <div class="content-card">
+            <h3>💻 代码实现</h3>
+            <div class="code-block">
+                <div class="code-title">使用 transformers 分词</div>
+                <pre><span class="keyword">from</span> transformers <span class="keyword">import</span> AutoTokenizer
+
+<span class="comment"># 加载分词器</span>
+tokenizer = AutoTokenizer.from_pretrained(<span class="string">'./model'</span>)
+
+<span class="comment"># 分词：文字 → ID 序列</span>
+text = <span class="string">"今天天气很好"</span>
+ids = tokenizer(text).input_ids
+<span class="keyword">print</span>(ids)  <span class="comment"># [5640, 3660, 1574, 658]</span>
+
+<span class="comment"># 解码：ID 序列 → 文字</span>
+decoded = tokenizer.decode(ids)
+<span class="keyword">print</span>(decoded)  <span class="comment"># 今天天气很好</span></pre>
+            </div>
+        </div>
+
+        <!-- 为什么需要分词 -->
+        <div class="content-card">
+            <h3>❓ 为什么需要分词？</h3>
+            <table class="compare-table">
+                <thead>
+                    <tr>
+                        <th>方法</th>
+                        <th>优点</th>
+                        <th>缺点</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>字级别</td>
+                        <td>词表小，永不过时</td>
+                        <td>序列太长，语义颗粒度细</td>
+                    </tr>
+                    <tr>
+                        <td>词级别</td>
+                        <td>语义明确</td>
+                        <td>OOV（未登录词）问题</td>
+                    </tr>
+                    <tr>
+                        <td>BPE</td>
+                        <td>兼顾速度和效果</td>
+                        <td>需要训练词表</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- 总结 -->
+        <div class="content-card" style="text-align: center;">
+            <h3>📝 总结</h3>
+            <p style="font-size:1.2em; color:#00d4ff; margin:20px 0;">
+                分词 = 把文字拆成词元 (Token)<br>
+                每个词元对应词表中的一个 ID
+            </p>
+            <div class="btn-group">
+                <a href="index.html" class="btn btn-secondary">← 返回首页</a>
+                <a href="embedding.html" class="btn btn-primary">下一课：词嵌入 →</a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 模拟分词
+        function tokenize() {
+            const text = document.getElementById('inputSentence').value;
+            const resultDiv = document.getElementById('tokensResult');
+            const idsSpan = document.getElementById('tokenIds');
+
+            // 简化模拟：按词分
+            const mockWords = text.split('').filter(w => w.trim());
+            const wordToId = {
+                '今': 100, '天': 101, '气': 102, '很': 103, '好': 104,
+                '我': 105, '爱': 106, '学': 107, '习': 108, '。': 109,
+                '你': 110, '是': 111, '谁': 112, '吗': 113, '？': 114
+            };
+
+            let html = '';
+            const ids = [];
+
+            mockWords.forEach((word, index) => {
+                const id = wordToId[word] || Math.floor(Math.random() * 500 + 200);
+                ids.push(id);
+
+                setTimeout(() => {
+                    html += `
+                        <div class="token-box animate-fadeIn" style="animation-delay: ${index * 0.1}s">
+                            <div class="token-text">${word}</div>
+                            <div class="token-id">ID: ${id}</div>
+                        </div>
+                    `;
+                    resultDiv.innerHTML = html;
+                }, index * 100);
+            });
+
+            idsSpan.textContent = '[' + ids.join(', ') + ']';
+        }
+
+        // 页面加载时执行一次
+        document.addEventListener('DOMContentLoaded', () => {
+            tokenize();
+        });
+    </script>
+</body>
+</html>

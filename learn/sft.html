@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>监督微调 (SFT) - MiniMind 学习</title>
+    <link rel="stylesheet" href="styles/common.css">
+    <style>
+        .chat-demo { background:#1a1a2e; border-radius:12px; padding:20px; margin:20px 0; }
+        .chat-role { font-weight:bold; margin-bottom:5px; }
+        .chat-user { color:#58a6ff; }
+        .chat-assistant { color:#10b981; }
+        .chat-content { background:#0d1117; padding:15px; border-radius:8px; margin-bottom:15px; line-height:1.8; }
+        .label-mask { display:flex; gap:2px; margin:10px 0; flex-wrap:wrap; }
+        .label-token { padding:5px 10px; font-size:0.85em; border-radius:4px; }
+        .label-token.ignore { background:#333; color:#666; }
+        .label-token.train { background:#00d4ff; color:#000; }
+        .compare-flow { display:flex; justify-content:center; gap:30px; margin:30px 0; flex-wrap:wrap; }
+        .flow-stage { background:#1a1a2e; padding:20px; border-radius:12px; text-align:center; min-width:180px; }
+        .stage-arrow { color:#00d4ff; font-size:2em; align-self:center; }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <a href="index.html" class="logo"><div class="logo-icon">🧠</div><span>MiniMind 学习</span></a>
+            <div class="nav-links">
+                <a href="index.html" class="nav-link">首页</a>
+                <a href="tokenization.html" class="nav-link">分词</a>
+                <a href="embedding.html" class="nav-link">词嵌入</a>
+                <a href="position.html" class="nav-link">位置编码</a>
+                <a href="attention.html" class="nav-link">注意力</a>
+                <a href="precision.html" class="nav-link">精度量化</a>
+                <a href="forward.html" class="nav-link">前馈网络</a>
+                <a href="model_architecture.html" class="nav-link">模型架构</a>
+                <a href="moe.html" class="nav-link">MoE</a>
+                <a href="pretrain.html" class="nav-link">预训练</a>
+                <a href="sft.html" class="nav-link active">SFT</a>
+                <a href="lora.html" class="nav-link">LoRA</a>
+                <a href="dpo.html" class="nav-link">DPO</a>
+                <a href="grpo.html" class="nav-link">GRPO</a>
+                <a href="inference.html" class="nav-link">推理</a>
+                
+                <a href="rag_retrieval.html" class="nav-link">RAG 检索</a>
+                <a href="rag_augment.html" class="nav-link">RAG 增强</a>
+                <a href="rag_generation.html" class="nav-link">RAG 生成</a>
+                <a href="rag_pipeline.html" class="nav-link">RAG 流程</a>
+                <a href="full_pipeline.html" class="nav-link" style="color: var(--accent);">全流程</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="page-header">
+            <h1 class="page-title">👨‍🏫 监督微调 (SFT)</h1>
+            <p class="page-subtitle">如何让模型"听懂"人类的指令？</p>
+        </div>
+
+        <!-- 目的 -->
+        <div class="content-card">
+            <h3>🎯 核心理解：SFT 本质上是监督训练</h3>
+            <p>SFT 和预训练的<strong>训练机制完全一样</strong>，都是 Next Token Prediction + 交叉熵 loss，区别只是<strong>数据不同</strong>。</p>
+
+            <div class="concept-box" style="margin-top:20px;">
+                <div class="concept-title">💡 类比</div>
+                <p>预训练 = 大量自学教材 → 做"完形填空" → 学会语言规律</p>
+                <p>SFT = 有老师批改的作业 → 给定问题，有标准答案 → 学会回答问题</p>
+            </div>
+
+            <table class="compare-table" style="margin-top:20px;">
+                <thead><tr><th></th><th>预训练</th><th>SFT</th></tr></thead>
+                <tbody>
+                    <tr>
+                        <td><strong>本质</strong></td>
+                        <td>自监督学习</td>
+                        <td style="color:#00d4ff;"><strong>监督学习（就是训练！）</strong></td>
+                    </tr>
+                    <tr>
+                        <td><strong>Loss 计算</strong></td>
+                        <td colspan="2" style="text-align:center;">完全一样 = 交叉熵 (Next Token Prediction)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>数据来源</strong></td>
+                        <td>互联网海量文本（无标签）</td>
+                        <td>人工标注的指令-回答对</td>
+                    </tr>
+                    <tr>
+                        <td><strong>输入格式</strong></td>
+                        <td>连续文本段落</td>
+                        <td>对话格式：[USER] 指令 [ASSISTANT] 回答</td>
+                    </tr>
+                    <tr>
+                        <td><strong>训练目标</strong></td>
+                        <td>学会语言规律</td>
+                        <td>学会听懂指令并正确回答</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div style="background:#1a1a2e; padding:20px; border-radius:12px; margin-top:20px; border-left:4px solid #10b981;">
+                <h4 style="color:#10b981; margin-bottom:15px;">🔑 关键洞察</h4>
+                <p style="color:#ccc; margin-bottom:10px;">代码层面，SFT 和预训练几乎一样：</p>
+                <pre style="color:#58a6ff; font-size:0.9em;">
+<span class="comment"># 预训练</span>
+<span class="keyword">loss</span> = cross_entropy(logits[:, :-1], labels[:, 1:])
+
+<span class="comment"># SFT（监督微调）</span>
+<span class="keyword">loss</span> = cross_entropy(logits, expected_response)
+                </pre>
+                <p style="color:#888; margin-top:15px; font-size:0.9em;">区别：预训练自己预测下一个词，SFT 的"正确答案"是人工标注的</p>
+            </div>
+        </div>
+
+        <!-- 对话格式 -->
+        <div class="content-card" style="border-left:4px solid #58a6ff;">
+            <h3>📋 SFT 数据格式</h3>
+            <p>SFT 使用特殊的对话格式，包含 user（用户）和 assistant（助手）的多轮对话：</p>
+
+            <div class="chat-demo">
+                <div class="chat-role chat-user">User: 请问什么是人工智能？</div>
+                <div class="chat-content">
+                    <span style="color:#ff6b6b;">[INST]</span> 请问什么是人工智能？ <span style="color:#ff6b6b;">[/INST]</span><br>
+                    人工智能是计算机科学的一个分支，致力于开发能够执行通常需要人类智能的任务的系统...
+                </div>
+
+                <div class="chat-role chat-user">User: 它和机器学习有什么关系？</div>
+                <div class="chat-content">
+                    <span style="color:#ff6b6b;">[INST]</span> 它和机器学习有什么关系？ <span style="color:#ff6b6b;">[/INST]</span><br>
+                    机器学习是人工智能的一个子领域，它使计算机能够从数据中学习并改进性能...
+                </div>
+            </div>
+
+            <div style="background:#21262d; padding:20px; border-radius:12px; margin-top:20px;">
+                <p style="color:#8b949e; margin-bottom:15px;">JSON 格式数据示例：</p>
+                <pre style="color:#58a6ff; font-size:0.85em;">
+{
+  <span class="string">"conversations"</span>: [
+    {<span class="string">"role"</span>: <span class="string">"user"</span>, <span class="string">"content"</span>: <span class="string">"请问什么是人工智能？"</span>},
+    {<span class="string">"role"</span>: <span class="string">"assistant"</span>, <span class="string">"content"</span>: <span class="string">"人工智能是..."</span>},
+    {<span class="string">"role"</span>: <span class="string">"user"</span>, <span class="string">"content"</span>: <span class="string">"它和机器学习有什么关系？"</span>},
+    {<span class="string">"role"</span>: <span class="string">"assistant"</span>, <span class="string">"content"</span>: <span class="string">"机器学习是..."</span>}
+  ]
+}
+                </pre>
+            </div>
+        </div>
+
+        <!-- Label Masking -->
+        <div class="content-card" style="border-left:4px solid #10b981;">
+            <h3>🎭 Label Masking（标签掩码）</h3>
+            <p>SFT 训练时，只对 assistant 的回答部分计算 loss，user 的问题部分忽略：</p>
+
+            <div style="background:#21262d; padding:20px; border-radius:12px; margin:15px 0;">
+                <p style="color:#8b949e;">输入序列（拼接后的 token）：</p>
+                <div class="label-mask">
+                    <span class="label-token ignore">[BOS]</span>
+                    <span class="label-token ignore">请问</span>
+                    <span class="label-token ignore">什么是</span>
+                    <span class="label-token ignore">人工</span>
+                    <span class="label-token ignore">智能</span>
+                    <span class="label-token ignore">？</span>
+                    <span class="label-token ignore">[INST]</span>
+                    <span class="label-token ignore">[/INST]</span>
+                    <span class="label-token train" style="background:#10b981; color:#000;">人工</span>
+                    <span class="label-token train" style="background:#10b981; color:#000;">智能</span>
+                    <span class="label-token train" style="background:#10b981; color:#000;">是</span>
+                    <span class="label-token train" style="background:#10b981; color:#000;">计算机</span>
+                    <span class="label-token train" style="background:#10b981; color:#000;">科学</span>
+                    <span class="label-token train" style="background:#10b981; color:#000;">的</span>
+                    <span class="label-token train" style="background:#10b981; color:#000;">...</span>
+                    <span class="label-token ignore">[EOS]</span>
+                </div>
+
+                <div style="display:flex; gap:30px; justify-content:center; margin-top:20px;">
+                    <div style="text-align:center;">
+                        <span class="label-token ignore">灰色部分</span>
+                        <p style="color:#888; font-size:0.85em; margin-top:5px;">Label = -100（忽略）</p>
+                    </div>
+                    <div style="text-align:center;">
+                        <span class="label-token train">绿色部分</span>
+                        <p style="color:#888; font-size:0.85em; margin-top:5px;">Label = 真实 token（计算 loss）</p>
+                    </div>
+                </div>
+            </div>
+
+            <pre style="color:#58a6ff; font-size:0.85em;">
+<span class="comment"># 实现 label masking</span>
+<span class="keyword">labels</span> = input_ids.clone()
+<span class="keyword">labels</span>[:user_end_pos] = -100  <span class="comment"># user 部分忽略</span>
+
+<span class="comment"># 交叉熵损失自动忽略 label=-100 的位置</span>
+<span class="keyword">loss</span> = F.cross_entropy(logits.view(-1, vocab_size), labels.view(-1), ignore_index=-100)
+            </pre>
+        </div>
+
+        <!-- 训练流程 -->
+        <div class="content-card">
+            <h3>🔄 SFT 训练流程</h3>
+
+            <div class="compare-flow">
+                <div class="flow-stage" style="border:2px solid #58a6ff;">
+                    <div style="color:#58a6ff; font-size:2em;">1</div>
+                    <div style="color:#58a6ff;">加载预训练模型</div>
+                    <div style="color:#888; font-size:0.85em;">从 checkpoint 加载权重</div>
+                </div>
+                <div class="stage-arrow">→</div>
+                <div class="flow-stage" style="border:2px solid #10b981;">
+                    <div style="color:#10b981; font-size:2em;">2</div>
+                    <div style="color:#10b981;">加载指令数据</div>
+                    <div style="color:#888; font-size:0.85em;">对话格式的 dataset</div>
+                </div>
+                <div class="stage-arrow">→</div>
+                <div class="flow-stage" style="border:2px solid #ffe66d;">
+                    <div style="color:#ffe66d; font-size:2em;">3</div>
+                    <div style="color:#ffe66d;">计算 Next Token Loss</div>
+                    <div style="color:#888; font-size:0.85em;">只对回答部分</div>
+                </div>
+                <div class="stage-arrow">→</div>
+                <div class="flow-stage" style="border:2px solid #ff6b6b;">
+                    <div style="color:#ff6b6b; font-size:2em;">4</div>
+                    <div style="color:#ff6b6b;">反向传播更新</div>
+                    <div style="color:#888; font-size:0.85em;">微调模型参数</div>
+                </div>
+            </div>
+
+            <div style="background:#21262d; padding:20px; border-radius:12px; margin-top:20px;">
+                <p style="color:#8b949e; margin-bottom:15px;">SFT 本质上也是 Next Token Prediction，但：</p>
+                <ul style="color:#ccc; line-height:2; padding-left:20px;">
+                    <li>数据格式不同：对话格式 vs 纯文本</li>
+                    <li>Label 不同：只对 assistant 回答部分计算 loss</li>
+                    <li>数据量不同：通常几万到几十万条对话</li>
+                    <li>训练目标不同：学会回答问题 vs 学会续写文本</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- 数据质量 -->
+        <div class="content-card" style="border-left:4px solid #ff6b6b;">
+            <h3>📊 SFT 数据质量至关重要</h3>
+            <p>SFT 的效果很大程度上取决于数据质量：</p>
+
+            <table class="compare-table">
+                <thead><tr><th>维度</th><th>好数据</th><th>差数据</th></tr></thead>
+                <tbody>
+                    <tr>
+                        <td>格式</td>
+                        <td style="color:#10b981;">规范统一，符合模板</td>
+                        <td style="color:#ef4444;">格式混乱，缺失字段</td>
+                    </tr>
+                    <tr>
+                        <td>内容</td>
+                        <td style="color:#10b981;">答案准确，有帮助</td>
+                        <td style="color:#ef4444;">答案错误，有害内容</td>
+                    </tr>
+                    <tr>
+                        <td>多样性</td>
+                        <td style="color:#10b981;">覆盖各种任务类型</td>
+                        <td style="color:#ef4444;">数据单一，重复多</td>
+                    </tr>
+                    <tr>
+                        <td>长度</td>
+                        <td style="color:#10b981;">答案长度适中</td>
+                        <td style="color:#ef4444;">过长或过短</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- SFT 与预训练的本质区别 -->
+        <div class="content-card" style="border-left:4px solid #00d4ff;">
+            <h3>🔬 SFT 与预训练的本质区别</h3>
+            <p>表面上 SFT 和预训练都是 Next Token Prediction，但实际上有几个关键区别：</p>
+
+            <table class="compare-table" style="margin:20px 0;">
+                <thead><tr><th>维度</th><th>预训练</th><th>SFT</th></tr></thead>
+                <tbody>
+                    <tr>
+                        <td><strong>数据来源</strong></td>
+                        <td>互联网海量文本（无标签）</td>
+                        <td>人工标注的指令-回答对</td>
+                    </tr>
+                    <tr>
+                        <td><strong>正确答案</strong></td>
+                        <td>文本中"恰好是下一个词"</td>
+                        <td>人工认为的"最好回答"</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Label 计算位置</strong></td>
+                        <td>所有 token 都计算 loss</td>
+                        <td>只计算 assistant 回答部分 loss</td>
+                    </tr>
+                    <tr>
+                        <td><strong>学习目标</strong></td>
+                        <td>学会续写文本的一般规律</td>
+                        <td>学会遵循指令、回答问题</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Prompt 影响</strong></td>
+                        <td>不考虑 prompt（纯文本续写）</td>
+                        <td>学会理解 prompt 并响应</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="concept-box">
+                <div class="concept-title">💡 关键洞察：为什么 label masking 很重要？</div>
+                <p style="color:#ccc; margin-top:10px;">如果对 user 部分也计算 loss：</p>
+                <ul style="color:#ccc; padding-left:20px; line-height:1.8;">
+                    <li>模型会"记住"用户的问题（过拟合 user 输入）</li>
+                    <li>模型学到的是"用户怎么问，我就怎么答"，而不是真正理解任务</li>
+                    <li>不同用户的相同问题会学到相同的回答模式</li>
+                </ul>
+                <p style="color:#10b981; margin-top:10px;">只对 assistant 回答计算 loss，确保模型专注于学习"如何回答"，而不是"记住问题"</p>
+            </div>
+        </div>
+
+        <!-- SFT 能学到什么 -->
+        <div class="content-card">
+            <h3>🧠 SFT 能学到什么？</h3>
+            <p>预训练让模型学会语言规律，SFT 让模型学会"听话"：</p>
+
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px; margin:20px 0;">
+                <div style="background:#1a1a2e; padding:20px; border-radius:12px;">
+                    <h4 style="color:#ff6b6b; margin-bottom:15px;">❌ 预训练能做的</h4>
+                    <ul style="color:#ccc; line-height:1.8;">
+                        <li>续写故事、续写文章</li>
+                        <li>完成句子、补全代码</li>
+                        <li>语言翻译（隐式）</li>
+                        <li>问答（基于文中的信息）</li>
+                    </ul>
+                </div>
+                <div style="background:#1a1a2e; padding:20px; border-radius:12px;">
+                    <h4 style="color:#10b981; margin-bottom:15px;">✓ SFT 后能做的</h4>
+                    <ul style="color:#ccc; line-height:1.8;">
+                        <li>遵循明确指令（"请解释..."）</li>
+                        <li>多轮对话保持上下文</li>
+                        <li>角色扮演、风格控制</li>
+                        <li>工具调用、代码执行</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="concept-box">
+                <div class="concept-title">💡 类比</div>
+                <p>预训练 = 大量阅读各学科书籍 → 学会语言本身</p>
+                <p>SFT = 通过"做题"学会应用 → 学会按要求回答</p>
+            </div>
+        </div>
+
+        <!-- 为什么 SFT 之后还需要 DPO/GRPO -->
+        <div class="content-card" style="border-left:4px solid #7c3aed;">
+            <h3>⚠️ 为什么 SFT 之后还需要 DPO/GRPO？</h3>
+            <p>SFT 学到的是"标准答案"，但人类偏好远比"标准答案"复杂：</p>
+
+            <div class="pref-pair">
+                <div class="pref-box">
+                    <div style="color:#ff6b6b; margin-bottom:10px;">SFT 认为的好答案</div>
+                    <p style="color:#ccc;">巴黎是法国的首都，人口约220万...</p>
+                    <p style="color:#888; font-size:0.85em; margin-top:10px;">标准、正确、但可能过于机械</p>
+                </div>
+                <div class="pref-box">
+                    <div style="color:#10b981; margin-bottom:10px;">人类真正喜欢的好答案</div>
+                    <p style="color:#ccc;">巴黎超棒的！不仅是浪漫之都，还有埃菲尔铁塔、卢浮宫...人口不多但超级有魅力！</p>
+                    <p style="color:#888; font-size:0.85em; margin-top:10px;">生动、有感染力、符合人类偏好</p>
+                </div>
+            </div>
+
+            <div class="concept-box">
+                <div class="concept-title">💡 DPO/GRPO 的作用</div>
+                <p>SFT 学"标准答案"，DPO/GRPO 学"人类偏好"</p>
+                <p style="color:#888; margin-top:5px; font-size:0.9em;">DPO/GRPO 不会改变模型的基础能力，而是在 SFT 基础上进一步对齐人类的"品味"</p>
+            </div>
+        </div>
+
+        <!-- 总结 -->
+        <div class="content-card" style="text-align:center;">
+            <h3>📝 总结</h3>
+            <p style="font-size:1.2em; color:#00d4ff; margin:20px 0;">
+                SFT = 预训练模型 + 指令数据 → 微调 → 学会回答问题
+            </p>
+
+            <div style="background:#21262d; padding:20px; border-radius:12px; text-align:left; margin:20px auto; max-width:600px;">
+                <h4 style="color:#ffe66d; margin-bottom:15px;">🎯 SFT 关键点：</h4>
+                <ul style="color:#ccc; line-height:2;">
+                    <li><strong>数据格式</strong>：多轮对话，user/assistant 交替</li>
+                    <li><strong>Label Masking</strong>：只对 assistant 回答计算 loss</li>
+                    <li><strong>数据量</strong>：通常 10K-100K 条对话</li>
+                    <li><strong>数据质量</strong>：答案准确、格式规范、多样性足</li>
+                    <li><strong>学习率</strong>：通常比预训练小 10-100 倍</li>
+                </ul>
+            </div>
+
+            <div class="btn-group">
+                <a href="pretrain.html" class="btn btn-secondary">← 上一课：预训练</a>
+                <a href="lora.html" class="btn btn-primary">下一课：LoRA →</a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>词嵌入 (Embedding) - MiniMind 学习</title>
+    <link rel="stylesheet" href="styles/common.css">
+    <style>
+        /* 页面特定样式 */
+        .vocab-mock {
+            display: grid;
+            grid-template-columns: repeat(5, 60px);
+            gap: 3px;
+            margin: 20px auto;
+            width: fit-content;
+        }
+
+        .vocab-cell {
+            width: 60px;
+            height: 35px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            border-radius: 4px;
+            background: #2a2a3e;
+            color: #666;
+        }
+
+        .vocab-cell.header {
+            background: #333;
+            color: #ffe66d;
+            font-weight: bold;
+        }
+
+        .vocab-cell.highlight {
+            background: #00d4ff;
+            color: #000;
+            font-weight: bold;
+        }
+
+        .vocab-cell.selected {
+            background: #10b981;
+            color: #000;
+            box-shadow: 0 0 15px #10b981;
+        }
+
+        .demo-area {
+            background: rgba(0,0,0,0.3);
+            border-radius: 15px;
+            padding: 30px;
+            margin: 25px 0;
+            text-align: center;
+        }
+
+        .input-word {
+            width: 150px;
+            padding: 12px 20px;
+            font-size: 18px;
+            border: 2px solid #00d4ff;
+            border-radius: 10px;
+            background: #1a1a2e;
+            color: #fff;
+            text-align: center;
+            outline: none;
+        }
+
+        .output-vector {
+            display: flex;
+            justify-content: center;
+            align-items: flex-end;
+            gap: 2px;
+            height: 80px;
+            margin: 20px auto;
+            padding: 10px;
+        }
+
+        .vector-bar {
+            width: 6px;
+            border-radius: 2px;
+            transition: all 0.5s;
+        }
+
+        .matrix-row {
+            display: flex;
+            gap: 2px;
+            margin: 3px 0;
+            justify-content: center;
+        }
+
+        .matrix-cell-viz {
+            width: 30px;
+            height: 20px;
+            background: #2a2a3e;
+            border-radius: 2px;
+        }
+
+        .matrix-cell-viz.highlight {
+            background: #00d4ff;
+        }
+    </style>
+</head>
+<body>
+    <!-- 导航栏 -->
+    <nav class="navbar">
+        <div class="container">
+            <a href="index.html" class="logo">
+                <div class="logo-icon">🧠</div>
+                <span>MiniMind 学习</span>
+            </a>
+            <div class="nav-links">
+                <a href="index.html" class="nav-link">首页</a>
+                <a href="tokenization.html" class="nav-link">分词</a>
+                <a href="embedding.html" class="nav-link active">词嵌入</a>
+                <a href="position.html" class="nav-link">位置编码</a>
+                <a href="attention.html" class="nav-link">注意力</a>
+                <a href="precision.html" class="nav-link">精度量化</a>
+                <a href="forward.html" class="nav-link">前馈网络</a>
+                <a href="model_architecture.html" class="nav-link">模型架构</a>
+                <a href="moe.html" class="nav-link">MoE</a>
+                <a href="pretrain.html" class="nav-link">预训练</a>
+                <a href="sft.html" class="nav-link">SFT</a>
+                <a href="lora.html" class="nav-link">LoRA</a>
+                <a href="dpo.html" class="nav-link">DPO</a>
+                <a href="grpo.html" class="nav-link">GRPO</a>
+                <a href="inference.html" class="nav-link">推理</a>
+                
+                <a href="rag_retrieval.html" class="nav-link">RAG 检索</a>
+                <a href="rag_augment.html" class="nav-link">RAG 增强</a>
+                <a href="rag_generation.html" class="nav-link">RAG 生成</a>
+                <a href="rag_pipeline.html" class="nav-link">RAG 流程</a>
+                <a href="full_pipeline.html" class="nav-link" style="color: var(--accent);">全流程</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <!-- 页面标题 -->
+        <div class="page-header">
+            <h1 class="page-title">📊 词嵌入 (Embedding)</h1>
+            <p class="page-subtitle">文字是如何变成计算机能"理解"的向量的？</p>
+        </div>
+
+        <!-- 概念解释 -->
+        <div class="content-card">
+            <h3>🎯 核心问题</h3>
+            <p>计算机只能处理数字，无法直接理解文字。那么，<strong>"今天天气很好"</strong> 这样的文字，如何转换成计算机能处理的数字呢？</p>
+            <p>答案就是：<strong>词嵌入 (Word Embedding)</strong> - 把每个词转换成一个数字向量。</p>
+
+            <div class="concept-box">
+                <div class="concept-title">💡 类比：地址</div>
+                <p>想象一下，词表就像一个大城市的地址簿。每个词都有一个大致的"位置"——语义相近的词，距离也相近。</p>
+                <div class="analogy">
+                    <div class="analogy-title">🏠 生活类比</div>
+                    <p>"猫" 和 "狗" 都是宠物，所以它们在"向量空间"中的位置很近。<br>
+                    "苹果" 和 "香蕉" 都是水果，位置也很近。<br>
+                    但 "猫" 和 "苹果" 距离就比较远。</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 步骤1: 词表 -->
+        <div class="content-card">
+            <h3>📋 第一步：认识词表</h3>
+            <p>词表 (Vocabulary) 就像一本字典，收录了模型认识的所有词。每个词都有一个唯一的 ID（从 0 开始编号）。</p>
+            <p>MiniMind 的词表大小是 <strong>6400</strong>，意味着它认识 6400 个不同的词元。</p>
+
+            <div class="demo-area">
+                <h4>词表结构示意</h4>
+                <div class="vocab-mock" id="vocabMock">
+                    <!-- 动态生成 -->
+                </div>
+                <p style="color:#888; font-size:0.9em;">↑ 这是一个简化示例，展示词表的 ID 和词元对应关系</p>
+            </div>
+
+            <div class="formula">
+                词表大小: 6400 = 模型认识的词元数量
+            </div>
+        </div>
+
+        <!-- 步骤2: 嵌入矩阵 -->
+        <div class="content-card">
+            <h3>📐 第二步：词嵌入矩阵</h3>
+            <p>词嵌入矩阵是一个 <strong>6400 × 768</strong> 的大表格：</p>
+            <ul style="color:#ccc; margin:15px 0; padding-left:20px;">
+                <li><strong>6400 行</strong>：每行对应词表中的一个词</li>
+                <li><strong>768 列</strong>：每个词被表示成一个 768 维的向量</li>
+            </ul>
+
+            <div class="demo-area">
+                <h4>词嵌入矩阵可视化</h4>
+                <div style="display:flex; align-items:center; justify-content:center; gap:20px;">
+                    <div style="display:flex; flex-direction:column; gap:3px;">
+                        <div class="matrix-cell-viz" style="background:#333; color:#ffe66d; height:30px; width:50px; display:flex; align-items:center; justify-content:center;">ID</div>
+                        <div style="display:flex; gap:3px;">
+                            <div class="matrix-cell-viz" style="background:#333; color:#ffe66d; height:100px; width:30px;"></div>
+                            <div>
+                                <div class="matrix-row"><div class="matrix-cell-viz"></div><div class="matrix-cell-viz"></div><div class="matrix-cell-viz"></div><div class="matrix-cell-viz"></div></div>
+                                <div class="matrix-row"><div class="matrix-cell-viz"></div><div class="matrix-cell-viz"></div><div class="matrix-cell-viz"></div><div class="matrix-cell-viz"></div></div>
+                                <div class="matrix-row"><div class="matrix-cell-viz"></div><div class="matrix-cell-viz"></div><div class="matrix-cell-viz"></div><div class="matrix-cell-viz"></div></div>
+                                <div class="matrix-row"><div class="matrix-cell-viz" style="color:#666; height:100px; display:flex; align-items:center; justify-content:center;">...</div></div>
+                                <div class="matrix-row"><div class="matrix-cell-viz"></div><div class="matrix-cell-viz"></div><div class="matrix-cell-viz"></div><div class="matrix-cell-viz"></div></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div style="color:#888;">
+                        =<br><br><br>
+                    </div>
+                    <div style="display:flex; flex-direction:column; align-items:center;">
+                        <div style="display:flex;">
+                            <div class="matrix-cell-viz" style="background:linear-gradient(90deg, #00d4ff, #7c3aed); height:30px; width:120px; display:flex; align-items:center; justify-content:center; color:#000; font-weight:bold;">768维向量</div>
+                        </div>
+                        <div style="display:flex; gap:3px; margin-top:3px;">
+                            <div class="matrix-cell-viz" style="width:50px; height:100px; display:flex; align-items:center; justify-content:center; writing-mode:vertical-lr; color:#888;">6400行</div>
+                            <div style="width:120px; height:100px; background:linear-gradient(135deg, rgba(0,212,255,0.2), rgba(124,58,237,0.2)); border-radius:5px; display:flex; align-items:center; justify-content:center; color:#00d4ff;">
+                                嵌入矩阵
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="formula">
+                Embedding 矩阵形状: (6400, 768)
+            </div>
+        </div>
+
+        <!-- 步骤3: 查表过程 -->
+        <div class="content-card">
+            <h3>🔍 第三步：查表过程</h3>
+            <p>词嵌入的核心就是一个<strong>查表操作</strong>：</p>
+            <ol style="color:#ccc; margin:15px 0; padding-left:20px; line-height:2;">
+                <li>分词器把句子分成词元，得到 Token IDs</li>
+                <li>用每个 Token ID 在嵌入矩阵中找到对应的行</li>
+                <li>取出这一行的 768 个数字，就是这个词的向量表示</li>
+            </ol>
+
+            <div class="demo-area">
+                <h4>🎮 交互演示：输入一个词，看看它的向量</h4>
+                <div class="input-group" style="justify-content:center;">
+                    <select id="wordSelect" class="select-field">
+                        <option value="123">今天 (ID: 123)</option>
+                        <option value="456">天气 (ID: 456)</option>
+                        <option value="789">很好 (ID: 789)</option>
+                        <option value="321">猫 (ID: 321)</option>
+                        <option value="654">狗 (ID: 654)</option>
+                    </select>
+                    <button class="btn btn-primary" onclick="showEmbedding()">🔍 查询</button>
+                </div>
+
+                <div id="embeddingResult" style="display:none;">
+                    <p style="color:#00d4ff; margin:15px 0;">查询结果：Token ID <span id="selectedId"></span> 对应的向量（简化展示32维）</p>
+                    <div class="output-vector" id="vectorBars"></div>
+                    <p style="color:#888; font-size:0.9em;">完整向量：[<span id="vectorValues"></span>, ...] (共768维)</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 步骤4: 矩阵来源 -->
+        <div class="content-card">
+            <h3>❓ 第四步：嵌入矩阵是哪来的？</h3>
+            <p>两个关键问题：</p>
+
+            <div class="concept-box">
+                <div class="concept-title">1. 一开始是什么样的？</div>
+                <p>嵌入矩阵一开始是<strong>随机数</strong>。就像一张白纸，模型什么都不知道。</p>
+            </div>
+
+            <div class="concept-box">
+                <div class="concept-title">2. 训练后有什么变化？</div>
+                <p>通过<strong>反向传播</strong>，模型会<strong>自动调整</strong>这些数字。</p>
+                <p>训练完成后，语义相似的词会有相似的向量——这就是" embedding"的魔力！</p>
+            </div>
+
+            <div class="formula">
+                训练前：随机数 → 训练后：有意义的向量
+            </div>
+        </div>
+
+        <!-- 多模态 Embedding -->
+        <div class="content-card">
+            <h3>🖼️ 多模态 Embedding：统一多模态表示</h3>
+            <p>对于多模态模型，核心问题是：如何让文本、图像、音频在<strong>同一个隐空间</strong>中表示，并且能相互理解？</p>
+
+            <div class="concept-box">
+                <div class="concept-title">1. 图像 Embedding：CLIP ViT 方案</div>
+                <p>通过预训练的 CLIP Vision Transformer 将图像转换为向量：</p>
+                <ul style="color:#ccc; margin:10px 0; padding-left:20px; line-height:1.8;">
+                    <li>图像切分成 16×16 的 patches（如 224×224 → 14×14=196 patches）</li>
+                    <li>每个 patch 经过 ViT 编码器得到一个向量</li>
+                    <li>196 个向量组成序列，输入 LLM</li>
+                </ul>
+                <div style="background:#1a1a2e; padding:15px; border-radius:8px; margin-top:10px;">
+                    <div style="display:flex; align-items:center; gap:15px; justify-content:center; flex-wrap:wrap;">
+                        <div style="text-align:center;">
+                            <div style="font-size:0.85em; color:#888;">图像</div>
+                            <div style="background:#333; padding:12px 18px; border-radius:5px;">224×224</div>
+                        </div>
+                        <div style="color:#00d4ff;">→</div>
+                        <div style="text-align:center;">
+                            <div style="font-size:0.85em; color:#888;">切分 Patches</div>
+                            <div style="background:#333; padding:12px 18px; border-radius:5px;">196 个 patches</div>
+                        </div>
+                        <div style="color:#00d4ff;">→</div>
+                        <div style="text-align:center;">
+                            <div style="font-size:0.85em; color:#888;">CLIP ViT</div>
+                            <div style="background:linear-gradient(90deg, #00d4ff, #7c3aed); padding:12px 18px; border-radius:5px; color:#000;">[196, 1024]</div>
+                        </div>
+                        <div style="color:#00d4ff;">→</div>
+                        <div style="text-align:center;">
+                            <div style="font-size:0.85em; color:#888;">投影到 LLM 空间</div>
+                            <div style="background:#333; padding:12px 18px; border-radius:5px;">[196, 4096]</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="concept-box">
+                <div class="concept-title">2. 图像 Embedding：VQ-VAE 方案</div>
+                <p>通过向量量化将图像变成"token"，每个 token 有对应的 embedding：</p>
+                <ul style="color:#ccc; margin:10px 0; padding-left:20px; line-height:1.8;">
+                    <li>VAE Encoder 将图像压缩到离散 latent 空间</li>
+                    <li>量化到 codebook 中的一个 code（类似词表中的 ID）</li>
+                    <li>从 codebook embedding 表中查找对应的向量</li>
+                </ul>
+                <div style="background:#1a1a2e; padding:15px; border-radius:8px; margin-top:10px;">
+                    <div style="display:flex; align-items:center; gap:15px; justify-content:center; flex-wrap:wrap;">
+                        <div style="text-align:center;">
+                            <div style="font-size:0.85em; color:#888;">图像</div>
+                            <div style="background:#333; padding:12px 18px; border-radius:5px;">512×512</div>
+                        </div>
+                        <div style="color:#00d4ff;">→</div>
+                        <div style="text-align:center;">
+                            <div style="font-size:0.85em; color:#888;">VAE 量化</div>
+                            <div style="background:#333; padding:12px 18px; border-radius:5px;">4096 个 codes</div>
+                        </div>
+                        <div style="color:#00d4ff;">→</div>
+                        <div style="text-align:center;">
+                            <div style="font-size:0.85em; color:#888;">Codebook 嵌入</div>
+                            <div style="background:linear-gradient(90deg, #7c3aed, #10b981); padding:12px 18px; border-radius:5px; color:#fff;">[4096, 4096]</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="concept-box">
+                <div class="concept-title">3. 音频 Embedding</div>
+                <p>通过神经网络 Codec 将音频转换为向量序列：</p>
+                <ul style="color:#ccc; margin:10px 0; padding-left:20px; line-height:1.8;">
+                    <li>波形通过 Encodec 编码器得到多码本 tokens</li>
+                    <li>每帧生成 4 个 token（多层码本）</li>
+                    <li>查 embedding 表得到音频向量序列</li>
+                </ul>
+                <div style="background:#1a1a2e; padding:15px; border-radius:8px; margin-top:10px;">
+                    <div style="display:flex; align-items:center; gap:15px; justify-content:center; flex-wrap:wrap;">
+                        <div style="text-align:center;">
+                            <div style="font-size:0.85em; color:#888;">音频</div>
+                            <div style="background:#333; padding:12px 18px; border-radius:5px;">波形 [samples]</div>
+                        </div>
+                        <div style="color:#00d4ff;">→</div>
+                        <div style="text-align:center;">
+                            <div style="font-size:0.85em; color:#888;">Encodec</div>
+                            <div style="background:#333; padding:12px 18px; border-radius:5px;">4 码本 tokens</div>
+                        </div>
+                        <div style="color:#00d4ff;">→</div>
+                        <div style="text-align:center;">
+                            <div style="font-size:0.85em; color:#888;">嵌入查找</div>
+                            <div style="background:linear-gradient(90deg, #10b981, #ffe66d); padding:12px 18px; border-radius:5px;">[seq, 4096]</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="concept-box">
+                <div class="concept-title">4. 统一多模态投影</div>
+                <p>不同模态的向量通过<strong>投影层</strong>映射到 LLM 的统一隐空间：</p>
+                <div style="background:#1a1a2e; padding:20px; border-radius:8px; margin-top:10px;">
+                    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:15px;">
+                        <div style="text-align:center; padding:15px; background:#2a2a3e; border-radius:8px;">
+                            <div style="font-size:2em;">📝</div>
+                            <div style="color:#00d4ff; font-weight:bold; margin-top:5px;">文本嵌入</div>
+                            <div style="color:#888; font-size:0.8em; margin-top:3px;">[T, hidden]</div>
+                        </div>
+                        <div style="text-align:center; padding:15px; background:#2a2a3e; border-radius:8px;">
+                            <div style="font-size:2em;">🖼️</div>
+                            <div style="color:#7c3aed; font-weight:bold; margin-top:5px;">图像嵌入</div>
+                            <div style="color:#888; font-size:0.8em; margin-top:3px;">[I, vision_dim]</div>
+                        </div>
+                        <div style="text-align:center; padding:15px; background:#2a2a3e; border-radius:8px;">
+                            <div style="font-size:2em;">🎵</div>
+                            <div style="color:#10b981; font-weight:bold; margin-top:5px;">音频嵌入</div>
+                            <div style="color:#888; font-size:0.8em; margin-top:3px;">[A, audio_dim]</div>
+                        </div>
+                    </div>
+                    <div style="text-align:center; padding:15px 0; color:#888;">↓ ↓ ↓ 各自投影</div>
+                    <div style="text-align:center; padding:20px; background:linear-gradient(90deg, rgba(0,212,255,0.2), rgba(124,58,237,0.2)); border-radius:8px;">
+                        <div style="font-size:1.5em;">🔮</div>
+                        <div style="color:#fff; font-weight:bold; font-size:1.1em; margin-top:5px;">统一隐空间 [seq, 4096]</div>
+                        <div style="color:#888; font-size:0.85em; margin-top:5px;">Transformer LLM 处理</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="formula">
+                多模态 Embedding = 模态特定编码 → 投影层 W → 统一的 LLM 隐空间
+            </div>
+        </div>
+
+        <!-- 代码示例 -->
+        <div class="content-card">
+            <h3>💻 代码实现</h3>
+            <div class="code-block">
+                <div class="code-title">PyTorch 词嵌入层</div>
+                <pre><span class="keyword">import</span> torch
+<span class="keyword">import</span> torch.nn <span class="keyword">as</span> nn
+
+<span class="comment"># 创建词嵌入层</span>
+embedding = nn.Embedding(
+    num_embeddings=<span class="number">6400</span>,  <span class="comment"># 词表大小</span>
+    embedding_dim=<span class="number">768</span>     <span class="comment"># 向量维度</span>
+)
+
+<span class="comment"># 分词后的 Token IDs</span>
+token_ids = torch.tensor([<span class="number">5640</span>, <span class="number">3660</span>, <span class="number">1574</span>])
+
+<span class="comment"># 查表得到嵌入向量</span>
+vectors = embedding(token_ids)
+
+<span class="keyword">print</span>(vectors.shape)  <span class="comment"># torch.Size([3, 768])</span></pre>
+            </div>
+        </div>
+
+        <!-- 总结 -->
+        <div class="content-card" style="text-align: center;">
+            <h3>📝 总结</h3>
+            <p style="font-size:1.2em; color:#00d4ff; margin:20px 0;">
+                词嵌入 = 查表操作<br>
+                Token ID → 嵌入矩阵[ID] → 768维向量
+            </p>
+            <div class="btn-group">
+                <a href="tokenization.html" class="btn btn-secondary">← 上一课：分词</a>
+                <a href="position.html" class="btn btn-primary">下一课：位置编码 →</a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 初始化词表可视化
+        function initVocab() {
+            const container = document.getElementById('vocabMock');
+            let html = '<div class="vocab-cell header">ID</div><div class="vocab-cell header">词</div><div class="vocab-cell header">→</div><div class="vocab-cell header">向量</div><div class="vocab-cell header">...</div>';
+
+            const words = ['[PAD]', '[UNK]', '的', '今天', '天气'];
+            for (let i = 0; i < 5; i++) {
+                html += `<div class="vocab-cell">${i}</div>`;
+                html += `<div class="vocab-cell">${words[i]}</div>`;
+                html += `<div class="vocab-cell">→</div>`;
+                html += `<div class="vocab-cell">[${i*10},${i*10+1},...]</div>`;
+                html += `<div class="vocab-cell">...</div>`;
+            }
+
+            for (let i = 0; i < 5; i++) {
+                html += '<div class="vocab-cell">...</div><div class="vocab-cell">...</div><div class="vocab-cell">...</div><div class="vocab-cell">...</div><div class="vocab-cell">...</div>';
+            }
+
+            const lastWords = ['很', '好', '。', '猫', '狗'];
+            for (let i = 6395; i < 6400; i++) {
+                html += `<div class="vocab-cell">${i}</div>`;
+                html += `<div class="vocab-cell">${lastWords[i-6395]}</div>`;
+                html += `<div class="vocab-cell">→</div>`;
+                html += `<div class="vocab-cell">[${i},${i+1},...]</div>`;
+                html += `<div class="vocab-cell">...</div>`;
+            }
+
+            container.innerHTML = html;
+        }
+
+        // 显示嵌入结果
+        function showEmbedding() {
+            const wordSelect = document.getElementById('wordSelect');
+            const selectedId = parseInt(wordSelect.value);
+
+            document.getElementById('selectedId').textContent = selectedId;
+            document.getElementById('embeddingResult').style.display = 'block';
+
+            // 生成简单的可视化
+            const vectorBars = document.getElementById('vectorBars');
+            const vectorValues = document.getElementById('vectorValues');
+
+            let barsHtml = '';
+            const seed = selectedId * 12345;
+            const values = [];
+
+            for (let i = 0; i < 32; i++) {
+                const val = Math.sin(seed + i) * 0.8;
+                values.push(val);
+                const color = val > 0 ? '#00d4ff' : '#ff6b6b';
+                const height = Math.abs(val) * 70 + 10;
+                barsHtml += `<div class="vector-bar" style="height:${height}%;background:${color};"></div>`;
+            }
+
+            vectorBars.innerHTML = barsHtml;
+            vectorValues.textContent = values.slice(0, 4).map(v => v.toFixed(2)).join(', ');
+        }
+
+        // 初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            initVocab();
+        });
+    </script>
+</body>
+</html>

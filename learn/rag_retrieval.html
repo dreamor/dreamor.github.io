@@ -1,0 +1,1162 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RAG 检索阶段 (Retrieval) - MiniMind 学习</title>
+    <link rel="stylesheet" href="styles/common.css">
+    <style>
+        /* 页面特定样式 */
+        .viz-container {
+            background: rgba(0,0,0,0.3);
+            border-radius: 15px;
+            padding: 30px;
+            margin: 25px 0;
+        }
+
+        .chunking-demo {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .chunking-text {
+            background: #1a1a2e;
+            border-radius: 10px;
+            padding: 20px;
+            line-height: 1.8;
+            font-size: 0.95em;
+        }
+
+        .chunk {
+            display: inline;
+            padding: 3px 6px;
+            margin: 2px;
+            border-radius: 4px;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+
+        .chunk:hover {
+            transform: scale(1.05);
+        }
+
+        .chunk-overlap {
+            background: rgba(124, 58, 237, 0.3);
+            border: 1px dashed #7c3aed;
+        }
+
+        .chunk-normal {
+            background: rgba(0, 212, 255, 0.2);
+            border: 1px solid #00d4ff;
+        }
+
+        .overlap-badge {
+            background: #7c3aed;
+            color: #fff;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 0.75em;
+            margin-left: 10px;
+        }
+
+        .slider-group {
+            display: flex;
+            gap: 30px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin: 20px 0;
+        }
+
+        .slider-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .slider-label {
+            color: #888;
+            font-size: 0.9em;
+        }
+
+        .slider-value {
+            color: #00d4ff;
+            font-weight: bold;
+            font-size: 1.2em;
+        }
+
+        input[type="range"] {
+            width: 200px;
+            accent-color: #00d4ff;
+        }
+
+        .chunk-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .chunk-item {
+            background: #2a2a3e;
+            padding: 8px 15px;
+            border-radius: 8px;
+            font-size: 0.85em;
+            transition: all 0.3s;
+            border: 1px solid #333;
+        }
+
+        .chunk-item:hover {
+            background: rgba(0, 212, 255, 0.2);
+            border-color: #00d4ff;
+            transform: translateY(-2px);
+        }
+
+        .chunk-item.overlap {
+            background: rgba(124, 58, 237, 0.2);
+            border-color: #7c3aed;
+        }
+
+        .embedding-flow {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+            flex-wrap: wrap;
+            padding: 20px;
+        }
+
+        .flow-step {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .flow-box {
+            background: #2a2a3e;
+            padding: 15px 25px;
+            border-radius: 10px;
+            text-align: center;
+            min-width: 120px;
+        }
+
+        .flow-arrow {
+            color: #00d4ff;
+            font-size: 2em;
+            opacity: 0;
+            transition: opacity 0.5s;
+        }
+
+        .flow-arrow.visible {
+            opacity: 1;
+        }
+
+        .flow-icon {
+            font-size: 2em;
+            margin-bottom: 5px;
+        }
+
+        .embedding-model {
+            background: linear-gradient(135deg, #00d4ff, #7c3aed);
+            color: #000;
+            font-weight: bold;
+        }
+
+        .vector-display {
+            font-family: monospace;
+            color: #ffe66d;
+            font-size: 0.9em;
+        }
+
+        .similarity-svg {
+            width: 100%;
+            max-width: 600px;
+            height: 400px;
+            margin: 0 auto;
+            display: block;
+        }
+
+        .query-selector {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .query-btn {
+            padding: 8px 16px;
+            border: 1px solid #333;
+            border-radius: 8px;
+            background: #2a2a3e;
+            color: #ccc;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .query-btn:hover {
+            border-color: #00d4ff;
+            color: #00d4ff;
+        }
+
+        .query-btn.active {
+            background: rgba(0, 212, 255, 0.2);
+            border-color: #00d4ff;
+            color: #00d4ff;
+        }
+
+        .ranking-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-top: 20px;
+        }
+
+        .ranking-item {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            padding: 10px 15px;
+            background: #2a2a3e;
+            border-radius: 8px;
+            transition: all 0.3s;
+        }
+
+        .ranking-item.top {
+            background: rgba(16, 185, 129, 0.2);
+            border: 1px solid #10b981;
+        }
+
+        .ranking-number {
+            width: 28px;
+            height: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            background: #333;
+            color: #888;
+            font-weight: bold;
+            font-size: 0.9em;
+        }
+
+        .ranking-item.top .ranking-number {
+            background: #10b981;
+            color: #000;
+        }
+
+        .ranking-name {
+            flex: 1;
+            color: #ccc;
+        }
+
+        .ranking-score {
+            color: #00d4ff;
+            font-weight: bold;
+        }
+
+        .formula-box {
+            background: rgba(0, 0, 0, 0.4);
+            border-left: 4px solid #00d4ff;
+            padding: 15px 20px;
+            margin: 15px 0;
+            font-family: monospace;
+            color: #ffe66d;
+        }
+
+        .db-compare-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+
+        .db-compare-table th,
+        .db-compare-table td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #333;
+        }
+
+        .db-compare-table th {
+            background: #2a2a3e;
+            color: #00d4ff;
+            font-weight: 600;
+        }
+
+        .db-compare-table td {
+            color: #ccc;
+        }
+
+        .db-compare-table tr:hover td {
+            background: rgba(0, 212, 255, 0.05);
+        }
+
+        .index-type {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 15px;
+            font-size: 0.85em;
+            margin: 2px;
+        }
+
+        .index-flat {
+            background: rgba(0, 212, 255, 0.2);
+            color: #00d4ff;
+        }
+
+        .index-ivf {
+            background: rgba(124, 58, 237, 0.2);
+            color: #7c3aed;
+        }
+
+        .index-hnsw {
+            background: rgba(255, 230, 109, 0.2);
+            color: #ffe66d;
+        }
+
+        .topk-animation {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+            flex-wrap: wrap;
+            padding: 20px;
+        }
+
+        .topk-step {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .topk-box {
+            background: #2a2a3e;
+            padding: 15px 20px;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        .topk-box.highlight {
+            background: rgba(16, 185, 129, 0.2);
+            border: 2px solid #10b981;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); }
+            50% { box-shadow: 0 0 20px 5px rgba(16, 185, 129, 0.2); }
+        }
+
+        .topk-arrow {
+            color: #10b981;
+            font-size: 1.5em;
+        }
+
+        .btn-execute {
+            display: block;
+            margin: 15px auto;
+            padding: 12px 30px;
+            font-size: 1em;
+        }
+
+        .doc-vector {
+            fill-opacity: 0.8;
+            transition: all 0.3s;
+        }
+
+        .doc-vector:hover {
+            fill-opacity: 1;
+        }
+
+        .doc-vector.selected {
+            fill-opacity: 1;
+            stroke-width: 3;
+        }
+
+        .distance-line {
+            stroke-opacity: 0.3;
+            transition: stroke-opacity 0.3s;
+        }
+
+        .distance-line.active {
+            stroke-opacity: 0.8;
+        }
+
+        .tooltip {
+            position: absolute;
+            background: #1a1a2e;
+            border: 1px solid #00d4ff;
+            border-radius: 8px;
+            padding: 10px 15px;
+            font-size: 0.85em;
+            color: #ccc;
+            pointer-events: none;
+            z-index: 100;
+            display: none;
+        }
+
+        .tooltip-name {
+            color: #00d4ff;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .tooltip-coords {
+            color: #ffe66d;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <!-- 导航栏 -->
+    <nav class="navbar">
+        <div class="container">
+            <a href="index.html" class="logo">
+                <div class="logo-icon">🧠</div>
+                <span>MiniMind 学习</span>
+            </a>
+            <div class="nav-links">
+                <a href="index.html" class="nav-link">首页</a>
+                <a href="tokenization.html" class="nav-link">分词</a>
+                <a href="embedding.html" class="nav-link">词嵌入</a>
+                <a href="position.html" class="nav-link">位置编码</a>
+                <a href="attention.html" class="nav-link">注意力</a>
+                <a href="precision.html" class="nav-link">精度量化</a>
+                <a href="forward.html" class="nav-link">前馈网络</a>
+                <a href="model_architecture.html" class="nav-link">模型架构</a>
+                <a href="moe.html" class="nav-link">MoE</a>
+                <a href="pretrain.html" class="nav-link">预训练</a>
+                <a href="sft.html" class="nav-link">SFT</a>
+                <a href="lora.html" class="nav-link">LoRA</a>
+                <a href="dpo.html" class="nav-link">DPO</a>
+                <a href="grpo.html" class="nav-link">GRPO</a>
+                <a href="inference.html" class="nav-link">推理</a>
+                <a href="rag_retrieval.html" class="nav-link active">RAG 检索</a>
+                <a href="rag_augment.html" class="nav-link">RAG 增强</a>
+                <a href="rag_generation.html" class="nav-link">RAG 生成</a>
+                <a href="rag_pipeline.html" class="nav-link">RAG 流程</a>
+                <a href="full_pipeline.html" class="nav-link" style="color: var(--accent);">全流程</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <!-- 页面标题 -->
+        <div class="page-header">
+            <h1 class="page-title">📚 RAG 检索阶段 (Retrieval)</h1>
+            <p class="page-subtitle">大模型如何"找到"相关文档？</p>
+        </div>
+
+        <!-- 核心问题概念框 -->
+        <div class="content-card">
+            <h3>🎯 核心问题</h3>
+            <p>在 RAG (Retrieval-Augmented Generation) 系统中，<strong>检索阶段</strong>是至关重要的一步：当用户提问时，如何从海量文档中找到<strong>最相关</strong>的那些？</p>
+
+            <div class="concept-box">
+                <div class="concept-title">💡 类比：图书馆搜索</div>
+                <p>想象你走进一个藏书百万册的图书馆，想找"如何学习 Python 编程"相关的书籍。</p>
+                <div class="analogy">
+                    <div class="analogy-title">🏠 生活类比</div>
+                    <p>传统的关键词搜索就像按照书名的字母顺序查找——慢且不准确。<br>
+                    而 <strong>向量检索</strong> 就像是有一位图书管理员，她读过所有书，理解每本书的内容，<br>
+                    能根据你的问题直接推荐最相关的几本。这就是 RAG 检索的核心思想！</p>
+                </div>
+            </div>
+
+            <div class="formula">
+                RAG 检索 = 将文档和问题都转为向量 → 在向量空间中找"距离最近"的文档
+            </div>
+        </div>
+
+        <!-- 文档分块（Chunking）可视化 -->
+        <div class="content-card">
+            <h3>📦 文档分块 (Chunking)</h3>
+            <p>长文档不能整体处理，需要切成多个小块（chunk）。分块策略直接影响检索效果。</p>
+
+            <div class="viz-container">
+                <h4 style="text-align:center; color:#00d4ff; margin-bottom:20px;">🎮 交互演示：调整分块参数</h4>
+
+                <div class="slider-group">
+                    <div class="slider-item">
+                        <span class="slider-label">Chunk Size (tokens)</span>
+                        <span class="slider-value" id="chunkSizeValue">256</span>
+                        <input type="range" id="chunkSizeSlider" min="128" max="512" step="128" value="256">
+                    </div>
+                    <div class="slider-item">
+                        <span class="slider-label">Overlap (tokens)</span>
+                        <span class="slider-value" id="overlapValue">32</span>
+                        <input type="range" id="overlapSlider" min="0" max="64" step="32" value="32">
+                    </div>
+                </div>
+
+                <div class="chunking-text" id="chunkingText">
+                    机器学习是人工智能的一个分支，专注于让计算机从数据中学习并改进。通过分析大量数据，算法能够识别模式、做出预测并自动优化性能。从垃圾邮件过滤到语音助手，机器学习已经渗透到我们生活的方方面面。
+                </div>
+
+                <div id="chunkList" class="chunk-list"></div>
+            </div>
+        </div>
+
+        <!-- Embedding 过程动画 -->
+        <div class="content-card">
+            <h3>🔢 Embedding 过程</h3>
+            <p>分块后的文本片段通过 Embedding 模型转换为向量表示，这样才能计算相似度。</p>
+
+            <div class="viz-container">
+                <div class="embedding-flow" id="embeddingFlow">
+                    <div class="flow-step" id="flowText">
+                        <div class="flow-box">
+                            <div class="flow-icon">📄</div>
+                            <div>文本片段</div>
+                        </div>
+                    </div>
+                    <div class="flow-arrow" id="arrow1">→</div>
+                    <div class="flow-step" id="flowModel">
+                        <div class="flow-box embedding-model">
+                            <div class="flow-icon">🤖</div>
+                            <div>Embedding 模型</div>
+                        </div>
+                    </div>
+                    <div class="flow-arrow" id="arrow2">→</div>
+                    <div class="flow-step" id="flowVector">
+                        <div class="flow-box">
+                            <div class="flow-icon">📊</div>
+                            <div class="vector-display">[0.23, -0.45, 0.81, ...]</div>
+                        </div>
+                    </div>
+                </div>
+
+                <button class="btn btn-primary btn-execute" onclick="runEmbeddingAnimation()">▶️ 执行 Embedding</button>
+            </div>
+
+            <div class="concept-box" style="margin-top:15px;">
+                <div class="concept-title">📚 深入了解 Embedding</div>
+                <p>想知道 Embedding 模型是如何将文本转为向量的吗？</p>
+                <a href="embedding.html" class="btn btn-secondary">查看词嵌入详解 →</a>
+            </div>
+        </div>
+
+        <!-- RAG Embedding 模型详解 -->
+        <div class="content-card">
+            <h3>🔬 RAG Embedding 模型详解</h3>
+            <p>以下是 RAG 检索中 Embedding 模型的训练原理和实现方式：</p>
+
+            <h4 style="color: var(--primary); margin: 20px 0 10px;">1. 核心目标：语义匹配</h4>
+            <p>RAG 的 Embedding 任务只有一个目标：<strong>把查询和文档映射到同一个向量空间，让语义相近的内容距离更近。</strong></p>
+
+            <div class="concept-box">
+                <div class="concept-title">💡 与 LLM Token Embedding 的区别</div>
+                <table class="compare-table" style="margin-top:10px;">
+                    <tr><th>对比项</th><th>LLM Token Embedding</th><th>RAG Embedding</th></tr>
+                    <tr><td>训练目标</td><td>预测下一个 token</td><td>语义相似度 / 对比学习</td></tr>
+                    <tr><td>输入粒度</td><td>单个 token</td><td>整个句子 / 段落</td></tr>
+                    <tr><td>优化方向</td><td>语言模型效果</td><td>检索匹配精度</td></tr>
+                    <tr><td>使用场景</td><td>LLM 推理</td><td>向量数据库检索</td></tr>
+                </table>
+            </div>
+
+            <h4 style="color: var(--primary); margin: 20px 0 10px;">2. 模型架构：Transformer Encoder</h4>
+            <p>大多数 RAG Embedding 模型使用 Transformer <strong>Encoder</strong>（非 Decoder，因为不需要因果注意力）：</p>
+
+            <div class="viz-container">
+                <div class="flow-container">
+                    <div class="flow-box">
+                        <div style="font-size:2em;">📄</div>
+                        <div>[CLS] 今天 天气 很好 [SEP]</div>
+                    </div>
+                    <div class="flow-arrow">→</div>
+                    <div class="flow-box">
+                        <div style="font-size:2em;">🔧</div>
+                        <div>Transformer Encoder</div>
+                        <div style="font-size:0.8em; color:var(--text-secondary);">双向注意力</div>
+                    </div>
+                    <div class="flow-arrow">→</div>
+                    <div class="flow-box">
+                        <div style="font-size:2em;">📊</div>
+                        <div>[CLS] 向量</div>
+                        <div style="font-size:0.8em; color:var(--text-secondary);">768 维</div>
+                    </div>
+                    <div class="flow-arrow">→</div>
+                    <div class="flow-box">
+                        <div style="font-size:2em;">📏</div>
+                        <div>L2 Normalize</div>
+                        <div style="font-size:0.8em; color:var(--text-secondary);">||v|| = 1</div>
+                    </div>
+                </div>
+            </div>
+
+            <h4 style="color: var(--primary); margin: 20px 0 10px;">3. 训练方法：对比学习 (Contrastive Learning)</h4>
+            <p>这是 RAG Embedding 和 LLM Embedding 最大的区别 — <strong>InfoNCE 损失函数</strong>：</p>
+
+            <div class="formula" style="margin: 15px 0;">
+                Loss = -log( exp(sim(q, d⁺) / τ) / Σ<sub>j</sub> exp(sim(q, d<sub>j</sub>) / τ) )
+            </div>
+
+            <p>其中 <strong>τ 是温度系数</strong>（通常 0.01~0.1），控制分布锐利程度。</p>
+
+            <div class="concept-box">
+                <div class="concept-title">🔥 Hard Negative Mining（难负例挖掘）</div>
+                <p style="margin-top:10px;">随机负样本太简单，需要"难负例"来提升模型区分能力：</p>
+                <table class="compare-table" style="margin-top:10px;">
+                    <tr><th>方法</th><th>原理</th><th>效果</th></tr>
+                    <tr><td>同批次负采样</td><td>Q1 的负样本包括 Q2、Q3 的正样本</td><td>中等难度</td></tr>
+                    <tr><td>BM25 负采样</td><td>检索"看起来相关但实际不相关"的文档</td><td>高难度，更逼真</td></tr>
+                    <tr><td>跨批次负采样</td><td>跨 batch 共享负样本</td><td>增加干扰多样性</td></tr>
+                </table>
+            </div>
+
+            <h4 style="color: var(--primary); margin: 20px 0 10px;">4. 常用 RAG Embedding 模型</h4>
+            <table class="compare-table">
+                <tr><th>模型</th><th>维度</th><th>特点</th></tr>
+                <tr><td><strong>BAAI/bge-large-zh-v1.5</strong></td><td>1024</td><td>中文最强开源，支持中英文</td></tr>
+                <tr><td>text-embedding-ada-002</td><td>1536</td><td>OpenAI 最常用</td></tr>
+                <tr><td>all-MiniLM-L6-v2</td><td>384</td><td>英文，轻量快速</td></tr>
+                <tr><td>GTE-large-zh</td><td>1024</td><td>阿里开源，中文效果好</td></tr>
+                <tr><td>BAAI/bge-m3</td><td>1024</td><td>支持中英日韩多语言</td></tr>
+            </table>
+
+            <h4 style="color: var(--primary); margin: 20px 0 10px;">5. PyTorch 实现示例</h4>
+            <div class="code-block">
+                <div class="code-title">Python - RAG Embedding 简化实现</div>
+                <pre><code><span class="keyword">import</span> torch
+<span class="keyword">import</span> torch.nn <span class="keyword">as</span> nn
+<span class="keyword">import</span> torch.nn.functional <span class="keyword">as</span> F
+
+<span class="comment"># 句子向量生成：取 [CLS] token + 归一化</span>
+<span class="keyword">def</span> <span class="function">encode_sentence</span>(model, token_ids):
+    output = model.encoder(token_ids)
+    cls_vector = output[:, <span class="number">0</span>, :]  <span class="comment"># [CLS] 向量</span>
+    cls_vector = cls_vector / cls_vector.norm(dim=-1, keepdim=True)
+    <span class="keyword">return</span> cls_vector
+
+<span class="comment"># InfoNCE 对比学习损失</span>
+<span class="keyword">def</span> <span class="function">contrastive_loss</span>(query_emb, pos_doc_emb, neg_doc_embs, temperature=<span class="number">0.1</span>):
+    pos_sim = torch.dot(query_emb, pos_doc_emb) / temperature
+    neg_sims = torch.matmul(neg_doc_embs, query_emb) / temperature
+    loss = -torch.log(torch.exp(pos_sim) / (torch.exp(pos_sim) + torch.exp(neg_sims).sum()))
+    <span class="keyword">return</span> loss
+
+<span class="comment"># 实际使用：Sentence Transformers</span>
+<span class="keyword">from</span> sentence_transformers <span class="keyword">import</span> SentenceTransformer
+
+model = SentenceTransformer(<span class="string">'BAAI/bge-large-zh-v1.5'</span>)
+doc_embeddings = model.encode(docs, normalize_embeddings=<span class="keyword">True</span>)
+query_embedding = model.encode(query, normalize_embeddings=<span class="keyword">True</span>)
+
+<span class="comment"># 归一化后，余弦相似度 = 简单点积</span>
+similarity = query_embedding @ doc_embeddings.T</code></pre>
+            </div>
+
+            <h4 style="color: var(--primary); margin: 20px 0 10px;">6. 训练与检索全流程</h4>
+            <div class="flow-container">
+                <div class="flow-box">
+                    <div>1. 数据准备</div>
+                    <div style="font-size:0.8em; color:var(--text-secondary);">(query, pos_doc, neg_docs)</div>
+                </div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-box">
+                    <div>2. 前向编码</div>
+                    <div style="font-size:0.8em; color:var(--text-secondary);">Encoder → 向量</div>
+                </div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-box">
+                    <div>3. Loss 计算</div>
+                    <div style="font-size:0.8em; color:var(--text-secondary);">InfoNCE</div>
+                </div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-box">
+                    <div>4. 反向传播</div>
+                    <div style="font-size:0.8em; color:var(--text-secondary);">更新权重</div>
+                </div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-box">
+                    <div>5. 索引入库</div>
+                    <div style="font-size:0.8em; color:var(--text-secondary);">FAISS/Milvus</div>
+                </div>
+            </div>
+            <div style="text-align:center; margin-top:10px;">
+                <span style="color:var(--primary);">────→</span> 推理阶段：用户查询 → Encoder → 向量检索 → Top-K docs
+            </div>
+        </div>
+
+        <!-- 余弦相似度 2D 可视化 -->
+        <div class="content-card">
+            <h3>📐 余弦相似度 2D 可视化</h3>
+            <p>在高维向量空间中，文档的相似度通过<strong>余弦相似度</strong>来衡量。相似度越高，两个向量越"接近"。</p>
+
+            <div class="formula">
+                cosine_similarity(A, B) = (A · B) / (||A|| × ||B||)
+            </div>
+
+            <div class="viz-container">
+                <h4 style="text-align:center; color:#00d4ff; margin-bottom:15px;">选择查询向量</h4>
+
+                <div class="query-selector" id="querySelector">
+                    <button class="query-btn active" data-query="0">Query: Python编程</button>
+                    <button class="query-btn" data-query="1">Query: 机器学习</button>
+                    <button class="query-btn" data-query="2">Query: 文学小说</button>
+                </div>
+
+                <svg class="similarity-svg" id="similaritySvg" viewBox="0 0 600 400">
+                    <!-- 网格线 -->
+                    <defs>
+                        <pattern id="grid" width="50" height="50" patternUnits="userSpaceOnUse">
+                            <path d="M 50 0 L 0 0 0 50" fill="none" stroke="#333" stroke-width="0.5"/>
+                        </pattern>
+                    </defs>
+                    <rect width="600" height="400" fill="url(#grid)"/>
+
+                    <!-- 距离线会动态添加 -->
+                    <g id="distanceLines"></g>
+
+                    <!-- 文档向量点 -->
+                    <g id="docPoints"></g>
+
+                    <!-- 查询向量点 -->
+                    <g id="queryPoint"></g>
+                </svg>
+
+                <div class="tooltip" id="tooltip">
+                    <div class="tooltip-name"></div>
+                    <div class="tooltip-coords"></div>
+                </div>
+
+                <div id="rankingList" class="ranking-list"></div>
+            </div>
+        </div>
+
+        <!-- 向量数据库比较表 -->
+        <div class="content-card">
+            <h3>🗄️ 向量数据库比较</h3>
+            <p>不同的向量数据库采用不同的索引策略，适用于不同的场景：</p>
+
+            <table class="db-compare-table">
+                <thead>
+                    <tr>
+                        <th>数据库</th>
+                        <th>索引类型</th>
+                        <th>原理</th>
+                        <th>适用场景</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>FAISS</strong></td>
+                        <td>
+                            <span class="index-type index-flat">Flat</span>
+                            <span class="index-type index-ivf">IVF</span>
+                        </td>
+                        <td>暴力搜索或倒排索引</td>
+                        <td>单机、轻量级场景</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Chroma</strong></td>
+                        <td>
+                            <span class="index-type index-flat">Flat</span>
+                            <span class="index-type index-hnsw">HNSW</span>
+                        </td>
+                        <td>简单的持久化存储 + HNSW 图索引</td>
+                        <td>嵌入式/轻量级应用</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Milvus</strong></td>
+                        <td>
+                            <span class="index-type index-flat">Flat</span>
+                            <span class="index-type index-ivf">IVF</span>
+                            <span class="index-type index-hnsw">HNSW</span>
+                        </td>
+                        <td>分布式向量搜索引擎</td>
+                        <td>大规模生产环境</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="concept-box">
+                <div class="concept-title">索引类型解释</div>
+                <ul style="color:#ccc; margin:10px 0; padding-left:20px; line-height:1.8;">
+                    <li><strong>Flat</strong>：暴力搜索，遍历所有向量，速度慢但精确</li>
+                    <li><strong>IVF</strong> (Inverted File)：倒排索引，先聚类再搜索，加速但有精度损失</li>
+                    <li><strong>HNSW</strong> (Hierarchical NSW)：图索引，构建分层邻近图，高速高精度</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Top-K 检索动画 -->
+        <div class="content-card">
+            <h3>🏆 Top-K 检索流程</h3>
+            <p>给定查询，从向量数据库中返回最相似的 K 个文档：</p>
+
+            <div class="viz-container">
+                <div class="topk-animation" id="topkAnimation">
+                    <div class="topk-step">
+                        <div class="topk-box">
+                            <div style="font-size:1.5em;">❓</div>
+                            <div>用户查询</div>
+                            <div style="color:#00d4ff; font-size:0.85em;">"如何学习 Python？"</div>
+                        </div>
+                    </div>
+
+                    <div class="topk-arrow">→</div>
+
+                    <div class="topk-step">
+                        <div class="topk-box">
+                            <div style="font-size:1.5em;">🔍</div>
+                            <div>向量数据库</div>
+                            <div style="color:#888; font-size:0.85em;">100万+ 文档向量</div>
+                        </div>
+                    </div>
+
+                    <div class="topk-arrow">→</div>
+
+                    <div class="topk-step">
+                        <div class="topk-box">
+                            <div style="font-size:1.5em;">📊</div>
+                            <div>计算相似度</div>
+                            <div style="color:#888; font-size:0.85em;">余弦相似度排序</div>
+                        </div>
+                    </div>
+
+                    <div class="topk-arrow">→</div>
+
+                    <div class="topk-step">
+                        <div class="topk-box topk-highlight" id="topkResult1">
+                            <div style="font-size:1.5em;">🥇</div>
+                            <div>Top-1 文档</div>
+                        </div>
+                    </div>
+
+                    <div class="topk-step">
+                        <div class="topk-box topk-highlight" id="topkResult2">
+                            <div style="font-size:1.5em;">🥈</div>
+                            <div>Top-2 文档</div>
+                        </div>
+                    </div>
+
+                    <div class="topk-step">
+                        <div class="topk-box topk-highlight" id="topkResult3">
+                            <div style="font-size:1.5em;">🥉</div>
+                            <div>Top-3 文档</div>
+                        </div>
+                    </div>
+                </div>
+
+                <button class="btn btn-primary btn-execute" onclick="runTopKAnimation()">▶️ 播放检索动画</button>
+            </div>
+        </div>
+
+        <!-- PyTorch 代码示例 -->
+        <div class="content-card">
+            <h3>💻 代码实现</h3>
+            <div class="code-block">
+                <div class="code-title">PyTorch RAG 检索示例</div>
+                <pre><span class="keyword">import</span> torch
+<span class="keyword">from</span> sentence_transformers <span class="keyword">import</span> SentenceTransformer
+
+<span class="comment"># 1. 加载 Embedding 模型</span>
+model = SentenceTransformer(<span class="string">'all-MiniLM-L6-v2'</span>)
+
+<span class="comment"># 2. 对文档进行编码</span>
+documents = [<span class="string">"文档1内容..."</span>, <span class="string">"文档2内容..."</span>, ...]
+doc_embeddings = model.encode(documents)
+
+<span class="comment"># 3. 对查询进行编码</span>
+query = <span class="string">"用户的问题是什么？"</span>
+query_embedding = model.encode(query)
+
+<span class="comment"># 4. 计算余弦相似度</span>
+cos_sim = torch.nn.functional.cosine_similarity(
+    torch.tensor(query_embedding).unsqueeze(<span class="number">0</span>),
+    torch.tensor(doc_embeddings)
+)
+
+<span class="comment"># 5. 获取 Top-K 结果</span>
+top_k = <span class="number">3</span>
+_, indices = torch.topk(cos_sim, top_k)
+results = [documents[i] <span class="keyword">for</span> i <span class="keyword">in</span> indices]</pre>
+            </div>
+        </div>
+
+        <!-- 底部导航 -->
+        <div class="content-card" style="text-align: center;">
+            <div class="btn-group">
+                <a href="embedding.html" class="btn btn-secondary">← 词嵌入</a>
+                <a href="inference.html" class="btn btn-secondary">← 推理</a>
+                <a href="rag_augment.html" class="btn btn-primary">RAG 增强 →</a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 文档数据
+        const documents = [
+            { name: 'Python教程', x: 150, y: 120, vec: [0.8, 0.6] },
+            { name: 'JavaScript指南', x: 420, y: 80, vec: [0.3, 0.9] },
+            { name: '机器学习入门', x: 280, y: 200, vec: [0.7, 0.5] },
+            { name: '深度学习进阶', x: 350, y: 280, vec: [0.6, 0.4] },
+            { name: '红楼梦', x: 480, y: 320, vec: [0.1, 0.2] },
+            { name: '哈利波特', x: 520, y: 280, vec: [0.15, 0.25] }
+        ];
+
+        const queries = [
+            { name: 'Query: Python编程', x: 180, y: 150, vec: [0.75, 0.65] },
+            { name: 'Query: 机器学习', x: 300, y: 220, vec: [0.65, 0.45] },
+            { name: 'Query: 文学小说', x: 500, y: 300, vec: [0.12, 0.22] }
+        ];
+
+        let currentQuery = 0;
+
+        // 初始化 Chunking 可视化
+        function initChunking() {
+            updateChunks();
+        }
+
+        function updateChunks() {
+            const chunkSize = parseInt(document.getElementById('chunkSizeSlider').value);
+            const overlap = parseInt(document.getElementById('overlapSlider').value);
+
+            document.getElementById('chunkSizeValue').textContent = chunkSize;
+            document.getElementById('overlapValue').textContent = overlap;
+
+            const text = document.getElementById('chunkingText').textContent;
+            const totalChars = text.length;
+            const step = chunkSize - overlap;
+
+            let chunks = [];
+            let start = 0;
+            let chunkIndex = 0;
+
+            while (start < totalChars) {
+                const end = Math.min(start + chunkSize, totalChars);
+                chunks.push({
+                    text: text.substring(start, end),
+                    start: start,
+                    end: end,
+                    isOverlap: chunkIndex > 0,
+                    index: chunkIndex
+                });
+                start += step;
+                chunkIndex++;
+            }
+
+            const chunkList = document.getElementById('chunkList');
+            chunkList.innerHTML = chunks.map((chunk, i) =>
+                `<div class="chunk-item ${chunk.isOverlap ? 'overlap' : ''}">
+                    Chunk ${i + 1} ${chunk.isOverlap ? '<span class="overlap-badge">重叠区</span>' : ''}
+                </div>`
+            ).join('');
+
+            // 高亮 chunks
+            const chunkingText = document.getElementById('chunkingText');
+            let html = '';
+            let pos = 0;
+
+            chunks.forEach((chunk, i) => {
+                const isOverlap = chunk.start < pos;
+                const className = isOverlap ? 'chunk chunk-overlap' : 'chunk chunk-normal';
+                html += `<span class="${className}">${chunk.text}</span>`;
+                pos = chunk.end;
+            });
+
+            chunkingText.innerHTML = html;
+        }
+
+        // 滑块事件
+        document.getElementById('chunkSizeSlider').addEventListener('input', updateChunks);
+        document.getElementById('overlapSlider').addEventListener('input', updateChunks);
+
+        // Embedding 动画
+        let embeddingAnimating = false;
+        function runEmbeddingAnimation() {
+            if (embeddingAnimating) return;
+            embeddingAnimating = true;
+
+            const arrow1 = document.getElementById('arrow1');
+            const arrow2 = document.getElementById('arrow2');
+            const flowModel = document.getElementById('flowModel');
+            const flowVector = document.getElementById('flowVector');
+
+            arrow1.classList.remove('visible');
+            arrow2.classList.remove('visible');
+            flowModel.style.opacity = '0.5';
+            flowVector.style.opacity = '0.5';
+
+            setTimeout(() => {
+                arrow1.classList.add('visible');
+            }, 300);
+
+            setTimeout(() => {
+                flowModel.style.opacity = '1';
+            }, 600);
+
+            setTimeout(() => {
+                arrow2.classList.add('visible');
+            }, 1200);
+
+            setTimeout(() => {
+                flowVector.style.opacity = '1';
+                embeddingAnimating = false;
+            }, 1500);
+        }
+
+        // 初始化相似度可视化
+        function initSimilarityViz() {
+            renderSimilarityViz();
+        }
+
+        function renderSimilarityViz() {
+            const docPoints = document.getElementById('docPoints');
+            const queryPoint = document.getElementById('queryPoint');
+            const distanceLines = document.getElementById('distanceLines');
+            const rankingList = document.getElementById('rankingList');
+
+            queryPoint.innerHTML = '';
+            distanceLines.innerHTML = '';
+
+            const query = queries[currentQuery];
+
+            // 绘制文档点
+            docPoints.innerHTML = documents.map((doc, i) => {
+                const sim = cosineSimilarity(query.vec, doc.vec);
+                const color = getSimilarityColor(sim);
+                return `<circle
+                    class="doc-vector"
+                    cx="${doc.x}" cy="${doc.y}" r="20"
+                    fill="${color}"
+                    stroke="#333"
+                    data-name="${doc.name}"
+                    data-vec="[${doc.vec.join(', ')}]"
+                    data-sim="${sim.toFixed(3)}"
+                />`;
+            }).join('');
+
+            // 绘制查询点
+            queryPoint.innerHTML = `<circle cx="${query.x}" cy="${query.y}" r="25" fill="#00d4ff" stroke="#fff" stroke-width="3"/>
+                <text x="${query.x}" y="${query.y + 45}" text-anchor="middle" fill="#00d4ff" font-size="12" font-weight="bold">${query.name}</text>`;
+
+            // 计算并排序相似度
+            const similarities = documents.map((doc, i) => ({
+                index: i,
+                name: doc.name,
+                sim: cosineSimilarity(query.vec, doc.vec)
+            })).sort((a, b) => b.sim - a.sim);
+
+            // 绘制距离线
+            similarities.forEach((item, i) => {
+                const doc = documents[item.index];
+                const color = getSimilarityColor(item.sim);
+
+                if (i < 3) {
+                    distanceLines.innerHTML += `<line
+                        class="distance-line active"
+                        x1="${query.x}" y1="${query.y}"
+                        x2="${doc.x}" y2="${doc.y}"
+                        stroke="${color}"
+                        stroke-width="${2 + item.sim * 3}"
+                        data-sim="${item.sim.toFixed(3)}"
+                    />`;
+                }
+            });
+
+            // 更新排名列表
+            rankingList.innerHTML = similarities.map((item, i) =>
+                `<div class="ranking-item ${i < 3 ? 'top' : ''}">
+                    <div class="ranking-number">${i + 1}</div>
+                    <div class="ranking-name">${item.name}</div>
+                    <div class="ranking-score">${(item.sim * 100).toFixed(1)}%</div>
+                </div>`
+            ).join('');
+
+            // 添加 tooltip 事件
+            document.querySelectorAll('.doc-vector').forEach(circle => {
+                circle.addEventListener('mouseenter', showTooltip);
+                circle.addEventListener('mouseleave', hideTooltip);
+                circle.addEventListener('mousemove', moveTooltip);
+                circle.addEventListener('click', function() {
+                    document.querySelectorAll('.doc-vector').forEach(c => c.classList.remove('selected'));
+                    this.classList.add('selected');
+                });
+            });
+        }
+
+        function cosineSimilarity(a, b) {
+            const dot = a[0] * b[0] + a[1] * b[1];
+            const normA = Math.sqrt(a[0] * a[0] + a[1] * a[1]);
+            const normB = Math.sqrt(b[0] * b[0] + b[1] * b[1]);
+            return dot / (normA * normB);
+        }
+
+        function getSimilarityColor(sim) {
+            // 从红色(低)到绿色(高)
+            const r = Math.round(239 * (1 - sim));
+            const g = Math.round(69 + 116 * sim);
+            const b = Math.round(68 + 67 * (1 - sim));
+            return `rgb(${r}, ${g}, ${b})`;
+        }
+
+        function showTooltip(e) {
+            const tooltip = document.getElementById('tooltip');
+            tooltip.querySelector('.tooltip-name').textContent = e.target.dataset.name;
+            tooltip.querySelector('.tooltip-coords').textContent = '向量: [' + e.target.dataset.vec + ']\n相似度: ' + e.target.dataset.sim;
+            tooltip.style.display = 'block';
+        }
+
+        function hideTooltip() {
+            document.getElementById('tooltip').style.display = 'none';
+        }
+
+        function moveTooltip(e) {
+            const tooltip = document.getElementById('tooltip');
+            tooltip.style.left = (e.pageX + 15) + 'px';
+            tooltip.style.top = (e.pageY + 15) + 'px';
+        }
+
+        // 查询选择
+        document.querySelectorAll('.query-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                document.querySelectorAll('.query-btn').forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+                currentQuery = parseInt(this.dataset.query);
+                renderSimilarityViz();
+            });
+        });
+
+        // Top-K 动画
+        let topkAnimating = false;
+        function runTopKAnimation() {
+            if (topkAnimating) return;
+            topkAnimating = true;
+
+            const results = [
+                document.getElementById('topkResult1'),
+                document.getElementById('topkResult2'),
+                document.getElementById('topkResult3')
+            ];
+
+            results.forEach(r => r.classList.remove('topk-highlight'));
+
+            let i = 0;
+            const interval = setInterval(() => {
+                if (i < results.length) {
+                    results[i].classList.add('topk-highlight');
+                    i++;
+                } else {
+                    clearInterval(interval);
+                    setTimeout(() => {
+                        results.forEach(r => r.classList.remove('topk-highlight'));
+                        topkAnimating = false;
+                    }, 2000);
+                }
+            }, 800);
+        }
+
+        // 初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            initChunking();
+            initSimilarityViz();
+        });
+    </script>
+</body>
+</html>

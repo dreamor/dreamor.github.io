@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MiniMind 大模型学习网站</title>
+    <link rel="stylesheet" href="styles/common.css">
+    <style>
+        /* 首页特定样式 */
+        .hero {
+            text-align: center;
+            padding: 80px 0 60px;
+            position: relative;
+        }
+
+        .hero-icon {
+            width: 120px;
+            height: 120px;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            border-radius: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 60px;
+            margin: 0 auto 30px;
+            animation: pulse 3s infinite;
+        }
+
+        .hero h1 {
+            font-size: 3em;
+            margin-bottom: 20px;
+            background: linear-gradient(90deg, var(--primary), var(--accent));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .hero p {
+            color: var(--text-secondary);
+            font-size: 1.3em;
+            max-width: 700px;
+            margin: 0 auto 40px;
+        }
+
+        .start-btn-group {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .big-btn {
+            padding: 18px 40px;
+            font-size: 1.2em;
+            border-radius: 15px;
+        }
+
+        /* 学习路径 */
+        .learning-path {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            margin: 40px 0;
+            flex-wrap: wrap;
+        }
+
+        .path-item {
+            background: var(--bg-card);
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            color: var(--text-secondary);
+            transition: var(--transition);
+        }
+
+        .path-item:hover {
+            color: var(--primary);
+            background: var(--bg-hover);
+        }
+
+        .path-arrow {
+            color: var(--primary);
+            font-size: 1.2em;
+        }
+
+        /* 特点展示 */
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin: 40px 0;
+        }
+
+        .feature-card {
+            background: var(--bg-card);
+            border-radius: var(--radius-lg);
+            padding: 30px;
+            text-align: center;
+            border: 1px solid var(--border);
+            transition: var(--transition);
+        }
+
+        .feature-card:hover {
+            transform: translateY(-5px);
+            border-color: var(--primary);
+        }
+
+        .feature-icon {
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, rgba(0, 212, 255, 0.2), rgba(124, 58, 237, 0.2));
+            border-radius: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            margin: 0 auto 15px;
+        }
+
+        .feature-title {
+            font-size: 1.3em;
+            margin-bottom: 10px;
+        }
+
+        .feature-desc {
+            color: var(--text-secondary);
+            font-size: 0.95em;
+        }
+    </style>
+</head>
+<body>
+    <!-- 导航栏 -->
+    <nav class="navbar">
+        <div class="container">
+            <a href="index.html" class="logo">
+                <div class="logo-icon">🧠</div>
+                <span>MiniMind 学习</span>
+            </a>
+            <div class="nav-links">
+                <a href="index.html" class="nav-link active">首页</a>
+                <a href="tokenization.html" class="nav-link">分词</a>
+                <a href="embedding.html" class="nav-link">词嵌入</a>
+                <a href="position.html" class="nav-link">位置编码</a>
+                <a href="attention.html" class="nav-link">注意力</a>
+                <a href="precision.html" class="nav-link">精度量化</a>
+                <a href="forward.html" class="nav-link">前馈网络</a>
+                <a href="model_architecture.html" class="nav-link">模型架构</a>
+                <a href="moe.html" class="nav-link">MoE</a>
+                <a href="pretrain.html" class="nav-link">预训练</a>
+                <a href="sft.html" class="nav-link">SFT</a>
+                <a href="lora.html" class="nav-link">LoRA</a>
+                <a href="dpo.html" class="nav-link">DPO</a>
+                <a href="grpo.html" class="nav-link">GRPO</a>
+                <a href="inference.html" class="nav-link">推理</a>
+                <a href="rag_retrieval.html" class="nav-link">RAG 检索</a>
+                <a href="rag_augment.html" class="nav-link">RAG 增强</a>
+                <a href="rag_generation.html" class="nav-link">RAG 生成</a>
+                <a href="rag_pipeline.html" class="nav-link">RAG 流程</a>
+                <a href="full_pipeline.html" class="nav-link" style="color: var(--accent);">全流程</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <!-- Hero 区域 -->
+        <div class="hero">
+            <div class="hero-icon">🤖</div>
+            <h1>大模型学习指南</h1>
+            <p>从零开始，通过交互式动画和图解，全面理解大语言模型的原理、训练和推理过程。</p>
+            <div class="start-btn-group">
+                <a href="#concepts" class="btn btn-primary big-btn">🚀 开始学习</a>
+                <a href="inference.html" class="btn btn-secondary big-btn">🏃 快速体验</a>
+            </div>
+        </div>
+
+        <!-- 学习路径 -->
+        <div class="learning-path">
+            <div class="path-item">📝 分词</div>
+            <div class="path-arrow">→</div>
+            <div class="path-item">📊 词嵌入</div>
+            <div class="path-arrow">→</div>
+            <div class="path-item">📍 位置编码</div>
+            <div class="path-arrow">→</div>
+            <div class="path-item">🎯 注意力</div>
+            <div class="path-arrow">→</div>
+            <div class="path-item">📐 精度量化</div>
+            <div class="path-arrow">→</div>
+            <div class="path-item">🔄 前馈网络</div>
+            <div class="path-arrow">→</div>
+            <div class="path-item">🏗️ 模型架构</div>
+            <div class="path-arrow">→</div>
+            <div class="path-item">👥 MoE</div>
+            <div class="path-arrow">→</div>
+            <div class="path-item">📖 预训练</div>
+            <div class="path-arrow">→</div>
+            <div class="path-item">👨‍🏫 SFT</div>
+            <div class="path-arrow">→</div>
+            <div class="path-item">📝 LoRA</div>
+            <div class="path-arrow">→</div>
+            <div class="path-item">👍 DPO</div>
+            <div class="path-arrow">→</div>
+            <div class="path-item">🎮 GRPO</div>
+            <div class="path-arrow">→</div>
+            <div class="path-item">🔮 推理</div>
+            <div class="path-arrow">→</div>
+            <div class="path-item">📚 RAG</div>
+        </div>
+
+        <!-- 特点展示 -->
+        <div class="features">
+            <div class="feature-card">
+                <div class="feature-icon">🎬</div>
+                <div class="feature-title">交互式动画</div>
+                <div class="feature-desc">关键概念配有动画演示，帮助直观理解复杂机制</div>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">📖</div>
+                <div class="feature-title">通俗易懂</div>
+                <div class="feature-desc">用生活化的类比解释专业概念，零基础也能学会</div>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">💻</div>
+                <div class="feature-title">代码演示</div>
+                <div class="feature-desc">每个概念都配有 PyTorch 代码示例</div>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🔄</div>
+                <div class="feature-title">完整流程</div>
+                <div class="feature-desc">从理论到实战，涵盖训练、调优、推理全流程</div>
+            </div>
+        </div>
+
+        <!-- 基础概念章节 -->
+        <h2 class="section-title" id="concepts">📚 基础概念</h2>
+        <div class="card-grid">
+            <a href="tokenization.html" class="card">
+                <div class="card-icon">📝</div>
+                <div class="card-title">分词 (Tokenization)</div>
+                <div class="card-desc">计算机如何"认识"文字？用拼积木的类比来理解分词过程</div>
+            </a>
+            <a href="embedding.html" class="card">
+                <div class="card-icon">📊</div>
+                <div class="card-title">词嵌入 (Embedding)</div>
+                <div class="card-desc">文字如何变成向量？查表操作的可视化演示</div>
+            </a>
+            <a href="position.html" class="card">
+                <div class="card-icon">📍</div>
+                <div class="card-title">位置编码 (RoPE)</div>
+                <div class="card-desc">为什么"我打你"和"你打我"意思不同？旋转动画直观理解</div>
+            </a>
+            <a href="attention.html" class="card">
+                <div class="card-icon">🎯</div>
+                <div class="card-title">注意力机制</div>
+                <div class="card-desc">像搜索引擎一样找相关信息，QKV 投影动画演示</div>
+            </a>
+            <a href="precision.html" class="card">
+                <div class="card-icon">📐</div>
+                <div class="card-title">精度与量化</div>
+                <div class="card-desc">FP32、FP16、INT8 是什么？为什么量化不损失效果</div>
+            </a>
+            <a href="forward.html" class="card">
+                <div class="card-icon">🔄</div>
+                <div class="card-title">前馈网络 (FFN)</div>
+                <div class="card-desc">SwiGLU 激活函数，数据流动画展示</div>
+            </a>
+        </div>
+
+        <!-- 模型架构章节 -->
+        <h2 class="section-title">🏗️ 模型架构</h2>
+        <div class="card-grid">
+            <a href="model_architecture.html" class="card">
+                <div class="card-icon">🏗️</div>
+                <div class="card-title">整体架构</div>
+                <div class="card-desc">8 层 Transformer 堆叠，每层处理的抽象程度逐渐提升</div>
+            </a>
+            <a href="moe.html" class="card">
+                <div class="card-icon">👥</div>
+                <div class="card-title">MoE 混合专家</div>
+                <div class="card-desc">用团队分工的类比理解专家路由机制</div>
+            </a>
+        </div>
+
+        <!-- 训练流程章节 -->
+        <h2 class="section-title">📚 训练流程</h2>
+        <div class="card-grid">
+            <a href="pretrain.html" class="card">
+                <div class="card-icon">📖</div>
+                <div class="card-title">预训练 (Pretrain)</div>
+                <div class="card-desc">让模型学会"完形填空"，阅读海量文本建立基础能力</div>
+            </a>
+            <a href="sft.html" class="card">
+                <div class="card-icon">👨‍🏫</div>
+                <div class="card-title">监督微调 (SFT)</div>
+                <div class="card-desc">教模型听指令，像请家教一样微调模型</div>
+            </a>
+            <a href="lora.html" class="card">
+                <div class="card-icon">📝</div>
+                <div class="card-title">LoRA 高效微调</div>
+                <div class="card-desc">像贴便签一样轻量级微调，大幅减少训练参数</div>
+            </a>
+            <a href="dpo.html" class="card">
+                <div class="card-icon">👍</div>
+                <div class="card-title">DPO 偏好优化</div>
+                <div class="card-desc">直接比较两个答案优劣，让模型学习什么是"好"</div>
+            </a>
+            <a href="grpo.html" class="card">
+                <div class="card-icon">🎮</div>
+                <div class="card-title">GRPO 强化学习</div>
+                <div class="card-desc">通过试错和奖励学习，像训练小狗一样</div>
+            </a>
+        </div>
+
+        <!-- 推理流程章节 -->
+        <h2 class="section-title">🔮 推理流程</h2>
+        <div class="card-grid">
+            <a href="inference.html" class="card">
+                <div class="card-icon">🔮</div>
+                <div class="card-title">自回归生成</div>
+                <div class="card-desc">像接话游戏一样逐词生成，KV Cache 加速可视化</div>
+            </a>
+        </div>
+
+        <!-- RAG 章节 -->
+        <h2 class="section-title">📚 RAG 检索增强生成</h2>
+        <div class="card-grid">
+            <a href="rag_retrieval.html" class="card">
+                <div class="card-icon">🔍</div>
+                <div class="card-title">检索阶段 (Retrieval)</div>
+                <div class="card-desc">文档分块、Embedding、向量化搜索、余弦相似度可视化</div>
+            </a>
+            <a href="rag_augment.html" class="card">
+                <div class="card-icon">🔗</div>
+                <div class="card-title">增强阶段 (Augment)</div>
+                <div class="card-desc">Prompt 模板组装、Reranker 重排序、上下文注入</div>
+            </a>
+            <a href="rag_generation.html" class="card">
+                <div class="card-icon">🤖</div>
+                <div class="card-title">生成阶段 (Generate)</div>
+                <div class="card-desc">带上下文的 LLM 生成、幻觉检测、评估指标</div>
+            </a>
+        </div>
+
+        <!-- RAG 全流程入口 -->
+        <div class="content-card" style="background: linear-gradient(135deg, rgba(124, 58, 237, 0.15), rgba(0, 212, 255, 0.15)); border: 2px solid var(--secondary);" id="rag-pipeline">
+            <h3 style="color: var(--secondary);">🚀 RAG 完整流程动画</h3>
+            <p style="color: var(--text-secondary); margin: 15px 0;">从用户问题到最终答案，交互式了解 RAG 检索→增强→生成的完整工作流程。数据如何流动，答案如何生成。</p>
+            <div class="btn-group">
+                <a href="rag_pipeline.html" class="btn btn-primary">🔄 打开 RAG 流程动画</a>
+            </div>
+        </div>
+
+        <!-- 全流程入口 -->
+        <div class="content-card" style="background: linear-gradient(135deg, rgba(0, 212, 255, 0.1), rgba(124, 58, 237, 0.1)); border: 2px solid var(--primary);" id="full-pipeline">
+            <h3 style="color: var(--primary);">🚀 新功能：大模型全流程</h3>
+            <p style="color: var(--text-secondary); margin: 15px 0;">从分词到推理，交互式了解 LLM 的完整工作流程。点击播放按钮，观看数据如何在每个模块中流动和变换。</p>
+            <div class="btn-group">
+                <a href="full_pipeline.html" class="btn btn-primary">🌐 打开全流程动画</a>
+            </div>
+        </div>
+
+        <!-- 底部提示 -->
+        <div class="content-card" style="text-align: center; margin-top: 60px;">
+            <h3>💡 学习建议</h3>
+            <p style="color: var(--text-secondary); max-width: 600px; margin: 15px auto;">
+                建议按照页面顺序学习，从基础概念开始，逐步深入。每个页面都有交互式动画，动手试试更能加深理解！
+            </p>
+            <div class="btn-group">
+                <a href="tokenization.html" class="btn btn-primary">从第一课开始</a>
+            </div>
+        </div>
+
+        <!-- 页脚 -->
+        <footer style="text-align: center; padding: 40px 0; color: var(--text-muted);">
+            <p>基于 MiniMind 项目构建 | 致力于让大模型学习更简单</p>
+        </footer>
+    </div>
+
+    <script>
+        // 页面加载动画
+        document.addEventListener('DOMContentLoaded', () => {
+            const cards = document.querySelectorAll('.card, .feature-card');
+            cards.forEach((card, index) => {
+                card.style.opacity = '0';
+                card.style.transform = 'translateY(20px)';
+                setTimeout(() => {
+                    card.style.transition = 'all 0.5s ease';
+                    card.style.opacity = '1';
+                    card.style.transform = 'translateY(0)';
+                }, index * 100);
+            });
+        });
+    </script>
+</body>
+</html>

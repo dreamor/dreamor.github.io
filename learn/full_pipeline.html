@@ -1,0 +1,1431 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>大模型全流程 - MiniMind 学习</title>
+    <link rel="stylesheet" href="styles/common.css">
+    <style>
+        :root {
+            --bg-main: #0a0a12;
+            --bg-card: rgba(20, 20, 35, 0.9);
+            --border-color: rgba(255, 255, 255, 0.1);
+        }
+
+        body {
+            background: linear-gradient(180deg, var(--bg-main) 0%, #101020 100%);
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .page-title {
+            text-align: center;
+            padding: 20px 0 15px;
+        }
+
+        .page-title h1 {
+            font-size: 2em;
+            background: linear-gradient(90deg, var(--primary), var(--accent));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .page-title p {
+            color: #666;
+            margin-top: 8px;
+        }
+
+        /* 模式选择 */
+        .mode-tabs {
+            display: flex;
+            justify-content: center;
+            gap: 6px;
+            padding: 12px;
+            background: var(--bg-card);
+            border-radius: 14px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .mode-tab {
+            padding: 10px 18px;
+            background: transparent;
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            color: #888;
+            font-size: 0.85em;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .mode-tab:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+
+        .mode-tab.active {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            border-color: transparent;
+            color: #000;
+            font-weight: 600;
+        }
+
+        /* 可视化区域 */
+        .viz-panel {
+            background: var(--bg-card);
+            border-radius: 18px;
+            padding: 25px;
+            margin-bottom: 20px;
+            border: 1px solid var(--border-color);
+        }
+
+        /* 流程容器 */
+        .flow-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0;
+        }
+
+        /* 步骤行 */
+        .step-row {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            position: relative;
+            padding: 8px 0;
+        }
+
+        /* 步骤块 */
+        .step-box {
+            background: rgba(30, 30, 50, 0.95);
+            border: 2px solid var(--border-color);
+            border-radius: 12px;
+            padding: 12px 16px;
+            min-width: 120px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .step-box:hover {
+            transform: translateY(-2px);
+            border-color: rgba(255, 255, 255, 0.3);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .step-box.active {
+            border-color: var(--primary);
+            box-shadow: 0 0 25px rgba(0, 212, 255, 0.4);
+            animation: pulse-box 1.5s infinite;
+        }
+
+        .step-box.completed {
+            border-color: var(--success);
+            background: rgba(16, 185, 129, 0.1);
+        }
+
+        @keyframes pulse-box {
+            0%, 100% { box-shadow: 0 0 15px rgba(0, 212, 255, 0.3); }
+            50% { box-shadow: 0 0 35px rgba(0, 212, 255, 0.5); }
+        }
+
+        .step-box .icon {
+            font-size: 1.6em;
+            margin-bottom: 4px;
+        }
+
+        .step-box .name {
+            font-weight: 600;
+            font-size: 0.85em;
+            color: #fff;
+            margin-bottom: 3px;
+        }
+
+        .step-box .dim {
+            font-size: 0.7em;
+            color: var(--primary);
+            font-family: 'Courier New', monospace;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 2px 6px;
+            border-radius: 4px;
+            display: inline-block;
+        }
+
+        /* 箭头 */
+        .arrow-down {
+            width: 2px;
+            height: 30px;
+            background: linear-gradient(to bottom, rgba(255,255,255,0.2), rgba(255,255,255,0.4));
+            position: relative;
+            margin: 3px auto;
+        }
+
+        .arrow-down::after {
+            content: '';
+            position: absolute;
+            bottom: -6px;
+            left: 50%;
+            transform: translateX(-50%);
+            border-left: 5px solid transparent;
+            border-right: 5px solid transparent;
+            border-top: 7px solid rgba(255,255,255,0.4);
+        }
+
+        .arrow-down.active {
+            background: linear-gradient(to bottom, rgba(0, 212, 255, 0.3), var(--primary));
+        }
+
+        .arrow-down.active::after {
+            border-top-color: var(--primary);
+        }
+
+        .arrow-down.done {
+            background: linear-gradient(to bottom, rgba(16, 185, 129, 0.3), var(--success));
+        }
+
+        .arrow-down.done::after {
+            border-top-color: var(--success);
+        }
+
+        /* 水平箭头 */
+        .arrow-right {
+            display: flex;
+            align-items: center;
+            width: 35px;
+        }
+
+        .arrow-right::before {
+            content: '';
+            flex: 1;
+            height: 2px;
+            background: linear-gradient(to right, rgba(255,255,255,0.2), rgba(255,255,255,0.4));
+        }
+
+        .arrow-right::after {
+            content: '';
+            border-top: 5px solid transparent;
+            border-bottom: 5px solid transparent;
+            border-left: 6px solid rgba(255,255,255,0.4);
+        }
+
+        .arrow-right.active::before {
+            background: linear-gradient(to right, rgba(0, 212, 255, 0.3), var(--primary));
+        }
+
+        .arrow-right.active::after {
+            border-left-color: var(--primary);
+        }
+
+        /* 分组标签 */
+        .group-label {
+            position: absolute;
+            left: -80px;
+            top: 50%;
+            transform: translateY(-50%);
+            writing-mode: vertical-rl;
+            text-orientation: mixed;
+            font-size: 0.7em;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            padding: 6px 4px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 6px;
+        }
+
+        /* 循环框 */
+        .loop-box {
+            border: 2px dashed rgba(168, 85, 247, 0.5);
+            border-radius: 16px;
+            padding: 15px 20px;
+            position: relative;
+            background: rgba(168, 85, 247, 0.05);
+        }
+
+        .loop-box .loop-tag {
+            position: absolute;
+            top: -10px;
+            left: 15px;
+            background: var(--bg-main);
+            padding: 2px 10px;
+            font-size: 0.75em;
+            color: #a855f7;
+            border-radius: 8px;
+        }
+
+        /* 控制面板 */
+        .ctrl-panel {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 12px;
+            padding: 15px;
+            background: var(--bg-card);
+            border-radius: 14px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .ctrl-btn {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            background: rgba(40, 40, 60, 0.8);
+            border: 2px solid var(--border-color);
+            color: #fff;
+            font-size: 1em;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .ctrl-btn:hover:not(:disabled) {
+            background: var(--primary);
+            border-color: var(--primary);
+            color: #000;
+        }
+
+        .ctrl-btn:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        .ctrl-btn.play {
+            width: 52px;
+            height: 52px;
+            font-size: 1.2em;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            border: none;
+        }
+
+        .ctrl-btn.play.playing {
+            background: var(--warning);
+        }
+
+        .progress-box {
+            flex: 1;
+            max-width: 280px;
+            min-width: 150px;
+        }
+
+        .progress-track {
+            height: 5px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, var(--primary), var(--secondary));
+            border-radius: 3px;
+            transition: width 0.3s;
+        }
+
+        .progress-text {
+            text-align: center;
+            color: #888;
+            font-size: 0.75em;
+            margin-top: 5px;
+        }
+
+        .speed-box {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 5px 10px;
+            border-radius: 18px;
+        }
+
+        .speed-box span {
+            color: #666;
+            font-size: 0.8em;
+        }
+
+        .spd-btn {
+            padding: 3px 8px;
+            background: transparent;
+            border: none;
+            color: #888;
+            font-size: 0.8em;
+            cursor: pointer;
+            border-radius: 10px;
+            transition: all 0.2s;
+        }
+
+        .spd-btn.active {
+            background: var(--primary);
+            color: #000;
+            font-weight: 600;
+        }
+
+        /* 详情面板 */
+        .info-panel {
+            background: var(--bg-card);
+            border-radius: 16px;
+            padding: 20px;
+            border: 1px solid var(--border-color);
+        }
+
+        .info-header {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+
+        .info-icon {
+            width: 50px;
+            height: 50px;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5em;
+        }
+
+        .info-title {
+            flex: 1;
+        }
+
+        .info-title h3 {
+            font-size: 1.15em;
+            margin-bottom: 3px;
+        }
+
+        .info-title p {
+            color: #888;
+            font-size: 0.85em;
+        }
+
+        .info-metrics {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .metric-item {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 8px 14px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .metric-item label {
+            display: block;
+            color: #666;
+            font-size: 0.65em;
+            text-transform: uppercase;
+            margin-bottom: 2px;
+        }
+
+        .metric-item span {
+            color: var(--primary);
+            font-family: 'Courier New', monospace;
+            font-weight: 600;
+            font-size: 0.95em;
+        }
+
+        .info-body {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 10px;
+            padding: 14px 18px;
+        }
+
+        .info-body h4 {
+            color: var(--primary);
+            margin-bottom: 8px;
+            font-size: 0.95em;
+        }
+
+        .info-body p {
+            color: #aaa;
+            line-height: 1.6;
+            font-size: 0.9em;
+        }
+
+        .formula {
+            background: rgba(255, 230, 109, 0.1);
+            border: 1px solid rgba(255, 230, 109, 0.3);
+            border-radius: 6px;
+            padding: 8px 14px;
+            margin-top: 10px;
+            font-family: 'Courier New', monospace;
+            color: var(--accent);
+            text-align: center;
+            font-size: 0.9em;
+        }
+
+        .anim-info {
+            background: linear-gradient(135deg, rgba(0, 212, 255, 0.1), rgba(124, 58, 237, 0.1));
+            border: 1px solid rgba(0, 212, 255, 0.2);
+            border-radius: 8px;
+            padding: 12px 16px;
+            margin-top: 12px;
+            display: none;
+        }
+
+        .anim-info.show {
+            display: block;
+        }
+
+        .anim-info h5 {
+            color: var(--accent);
+            margin-bottom: 5px;
+            font-size: 0.9em;
+        }
+
+        .anim-info p {
+            color: #aaa;
+            font-size: 0.85em;
+        }
+
+        .tokens-box {
+            display: none;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 10px;
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.15), rgba(0, 212, 255, 0.15));
+            border-radius: 8px;
+            border: 1px solid var(--success);
+            margin-top: 12px;
+        }
+
+        .tokens-box.show {
+            display: flex;
+        }
+
+        .tokens-box .spin {
+            animation: spin 2s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .tokens-box .cnt {
+            font-size: 1.2em;
+            font-weight: 700;
+            color: var(--success);
+            font-family: 'Courier New', monospace;
+        }
+
+        .tokens-box .tok {
+            font-size: 1em;
+            color: var(--accent);
+            font-weight: 600;
+        }
+
+        .key-hints {
+            text-align: center;
+            color: #555;
+            font-size: 0.75em;
+            margin-top: 10px;
+        }
+
+        .key-hints kbd {
+            display: inline-block;
+            padding: 2px 6px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+            margin: 0 2px;
+        }
+
+        /* 响应式 */
+        @media (max-width: 900px) {
+            .group-label {
+                display: none;
+            }
+            
+            .step-box {
+                min-width: 100px;
+                padding: 10px 12px;
+            }
+            
+            .step-box .name {
+                font-size: 0.8em;
+            }
+            
+            .mode-tab {
+                padding: 8px 14px;
+                font-size: 0.8em;
+            }
+        }
+
+        @media (max-width: 600px) {
+            .step-row {
+                flex-wrap: wrap;
+                gap: 8px;
+            }
+            
+            .arrow-right {
+                width: 20px;
+            }
+            
+            .info-header {
+                flex-direction: column;
+                text-align: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <a href="index.html" class="logo">
+                <div class="logo-icon">🧠</div>
+                <span>MiniMind 学习</span>
+            </a>
+            <div class="nav-links">
+                <a href="index.html" class="nav-link">首页</a>
+                <a href="tokenization.html" class="nav-link">分词</a>
+                <a href="embedding.html" class="nav-link">词嵌入</a>
+                <a href="position.html" class="nav-link">位置编码</a>
+                <a href="attention.html" class="nav-link">注意力</a>
+                <a href="precision.html" class="nav-link">精度量化</a>
+                <a href="forward.html" class="nav-link">前馈网络</a>
+                <a href="model_architecture.html" class="nav-link">模型架构</a>
+                <a href="moe.html" class="nav-link">MoE</a>
+                <a href="pretrain.html" class="nav-link">预训练</a>
+                <a href="sft.html" class="nav-link">SFT</a>
+                <a href="lora.html" class="nav-link">LoRA</a>
+                <a href="dpo.html" class="nav-link">DPO</a>
+                <a href="grpo.html" class="nav-link">GRPO</a>
+                <a href="inference.html" class="nav-link">推理</a>
+                <a href="rag_retrieval.html" class="nav-link">RAG 检索</a>
+                <a href="rag_augment.html" class="nav-link">RAG 增强</a>
+                <a href="rag_generation.html" class="nav-link">RAG 生成</a>
+                <a href="rag_pipeline.html" class="nav-link">RAG 流程</a>
+                <a href="full_pipeline.html" class="nav-link active" style="color: var(--accent);">全流程</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="page-title">
+            <h1>大模型全流程数据流</h1>
+            <p>训练与推理的完整生命周期可视化</p>
+        </div>
+
+        <!-- 模式选择 -->
+        <div class="mode-tabs" id="modeTabs">
+            <button class="mode-tab active" data-mode="inference">🔮 推理</button>
+            <button class="mode-tab" data-mode="pretrain">📖 预训练</button>
+            <button class="mode-tab" data-mode="sft">👨‍🏫 SFT</button>
+            <button class="mode-tab" data-mode="lora">🔗 LoRA</button>
+            <button class="mode-tab" data-mode="dpo">👍 DPO</button>
+            <button class="mode-tab" data-mode="grpo">🎮 GRPO</button>
+            <button class="mode-tab" data-mode="rag">📚 RAG</button>
+        </div>
+
+        <!-- 可视化 -->
+        <div class="viz-panel" id="vizPanel"></div>
+
+        <!-- 控制器 -->
+        <div class="ctrl-panel">
+            <button class="ctrl-btn" id="prevBtn" title="上一步 (←)">⏮</button>
+            <button class="ctrl-btn play" id="playBtn" title="播放/暂停 (空格)">▶</button>
+            <button class="ctrl-btn" id="nextBtn" title="下一步 (→)">⏭</button>
+
+            <div class="progress-box">
+                <div class="progress-track">
+                    <div class="progress-bar" id="progressBar"></div>
+                </div>
+                <div class="progress-text" id="progressText">步骤 0 / 0</div>
+            </div>
+
+            <div class="speed-box">
+                <span>速度</span>
+                <button class="spd-btn" data-speed="0.5">0.5×</button>
+                <button class="spd-btn active" data-speed="1">1×</button>
+                <button class="spd-btn" data-speed="2">2×</button>
+            </div>
+
+            <button class="ctrl-btn" id="resetBtn" title="重置 (R)">↺</button>
+        </div>
+
+        <div class="key-hints">
+            <kbd>空格</kbd> 播放/暂停 | <kbd>←</kbd> 上一步 | <kbd>→</kbd> 下一步 | <kbd>R</kbd> 重置
+        </div>
+
+        <!-- 详情 -->
+        <div class="info-panel">
+            <div class="info-header">
+                <div class="info-icon" id="infoIcon">💡</div>
+                <div class="info-title">
+                    <h3 id="infoName">选择模式开始</h3>
+                    <p id="infoDesc">点击上方模式按钮选择流程</p>
+                </div>
+                <div class="info-metrics">
+                    <div class="metric-item">
+                        <label>维度</label>
+                        <span id="metricDim">-</span>
+                    </div>
+                    <div class="metric-item">
+                        <label>操作</label>
+                        <span id="metricOp">-</span>
+                    </div>
+                    <div class="metric-item">
+                        <label>参数</label>
+                        <span id="metricParam">-</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="info-body">
+                <h4>💡 说明</h4>
+                <p id="infoText">选择推理或训练模式，然后点击播放按钮观看数据流动画演示。</p>
+            </div>
+
+            <div class="anim-info" id="animInfo">
+                <h5 id="animTitle">动画详情</h5>
+                <p id="animText">-</p>
+            </div>
+
+            <div class="tokens-box" id="tokensBox">
+                <span class="spin">🔄</span>
+                <span>已生成</span>
+                <span class="cnt" id="tokCount">0</span>
+                <span>个 token</span>
+                <span>当前:</span>
+                <span class="tok" id="curTok">-</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ==================== 流程定义 ====================
+        const FLOWS = {
+            // 推理模式
+            inference: {
+                name: '推理模式',
+                groups: [
+                    {
+                        label: '输入',
+                        steps: [
+                            { icon: '💬', name: '输入文本', dim: '文本', op: 'Prompt', param: '-', color: '#3b82f6',
+                              desc: '用户输入自然语言 prompt',
+                              detail: '用户输入问题或指令，如"今天天气怎么样？"' },
+                            { icon: '📝', name: 'Tokenizer', dim: '[N]', op: 'BPE', param: 'vocab=6400', color: '#8b5cf6',
+                              desc: '文本 → token 序列',
+                              detail: '使用 BPE 分词将文本拆成子词单元',
+                              formula: '["今天","天气"] → [128, 256]' },
+                            { icon: '📊', name: 'Embedding', dim: '[N,768]', op: '查表', param: 'E∈R^{6400×768}', color: '#06b6d4',
+                              desc: 'token ID → 向量',
+                              detail: '通过 Embedding 矩阵映射到向量空间' },
+                            { icon: '📍', name: 'RoPE', dim: '[N,768]', op: '旋转', param: 'θ=1e6', color: '#10b981',
+                              desc: '注入位置信息',
+                              detail: '旋转位置编码，使模型理解词序',
+                              formula: 'x_rot = x·cos(θ) + x_rot·sin(θ)' }
+                        ]
+                    },
+                    {
+                        label: 'Transformer',
+                        loop: true,
+                        loopText: '×8 层',
+                        steps: [
+                            { icon: '🎯', name: 'Attention', dim: '[N,768]', op: 'Q·K^T·V', param: 'heads=8', color: '#f59e0b',
+                              desc: '多头自注意力',
+                              detail: '每个 token 关注序列中所有 token',
+                              formula: 'Attention(Q,K,V) = softmax(QK^T/√d)V' },
+                            { icon: '🔄', name: 'FFN', dim: '[N,768]', op: 'SwiGLU', param: 'hidden=2048', color: '#ec4899',
+                              desc: '前馈网络',
+                              detail: '升维 → SwiGLU 激活 → 降维',
+                              formula: 'FFN(x) = (xW₁ ⊙ SiLU(xW₃))W₂' }
+                        ]
+                    },
+                    {
+                        label: '输出',
+                        steps: [
+                            { icon: '📈', name: 'LM Head', dim: '[N,V]', op: '投影', param: 'V=6400', color: '#ef4444',
+                              desc: '投影到词表',
+                              detail: '将隐藏状态投影到词表大小' },
+                            { icon: '🎯', name: 'Softmax', dim: '[V]', op: '归一化', param: 'T=1.0', color: '#f97316',
+                              desc: '转为概率分布',
+                              detail: '将 logits 转为概率',
+                              formula: 'P(x) = exp(x/T) / Σexp(xᵢ)' },
+                            { icon: '🎲', name: 'Sampling', dim: '1', op: 'top-p', param: 'p=0.9', color: '#84cc16',
+                              desc: '采样下一个词',
+                              detail: '根据概率分布采样' }
+                        ]
+                    },
+                    {
+                        label: '循环',
+                        steps: [
+                            { icon: '➕', name: '追加序列', dim: '[N+1]', op: '拼接', param: '-', color: '#06b6d4',
+                              desc: '将生成 token 加入',
+                              detail: '自回归：新 token 加入输入序列' },
+                            { icon: '🔍', name: '检查结束', dim: '-', op: '判断', param: 'max=512', color: '#f59e0b',
+                              desc: '是否结束',
+                              detail: '遇到 EOS 或达到最大长度则停止' },
+                            { icon: '✨', name: '输出结果', dim: '文本', op: '解码', param: '-', color: '#10b981',
+                              desc: '最终生成文本',
+                              detail: '将 token 序列解码为文本' }
+                        ]
+                    }
+                ]
+            },
+
+            // 预训练
+            pretrain: {
+                name: '预训练',
+                groups: [
+                    {
+                        label: '数据',
+                        steps: [
+                            { icon: '📚', name: '语料', dim: 'TB级', op: '加载', param: '-', color: '#3b82f6',
+                              desc: '大规模文本',
+                              detail: '从互联网、书籍、代码等收集海量文本' },
+                            { icon: '📦', name: 'Batch', dim: '[B,L]', op: '批处理', param: '-', color: '#8b5cf6',
+                              desc: '组织批次',
+                              detail: '将数据组织成批次进行训练' },
+                            { icon: '🔤', name: '分词', dim: '[B,L]', op: '编码', param: 'vocab=6400', color: '#06b6d4',
+                              desc: '文本→ID',
+                              detail: '将文本转换为 token ID 序列' },
+                            { icon: '📊', name: '嵌入', dim: '[B,L,768]', op: '查表', param: '-', color: '#10b981',
+                              desc: '向量化',
+                              detail: '将 token ID 映射为向量' }
+                        ]
+                    },
+                    {
+                        label: '前向',
+                        loop: true,
+                        loopText: '×8层',
+                        steps: [
+                            { icon: '➡️', name: 'Forward', dim: '[B,L,768]', op: '前向', param: 'L=8', color: '#f59e0b',
+                              desc: '前向传播',
+                              detail: '数据流经 Transformer 各层' },
+                            { icon: '📈', name: 'Logits', dim: '[B,L,V]', op: '预测', param: '-', color: '#ec4899',
+                              desc: '模型输出',
+                              detail: '每个位置预测下一个词的概率' }
+                        ]
+                    },
+                    {
+                        label: '损失',
+                        steps: [
+                            { icon: '📉', name: 'Loss', dim: '标量', op: '交叉熵', param: '-', color: '#ef4444',
+                              desc: '计算损失',
+                              detail: '预测 vs 真实标签',
+                              formula: 'L = -Σ y_i log(p_i)' }
+                        ]
+                    },
+                    {
+                        label: '反向',
+                        steps: [
+                            { icon: '⬅️', name: 'Backward', dim: '梯度', op: '反向', param: '-', color: '#f97316',
+                              desc: '反向传播',
+                              detail: '计算所有参数的梯度',
+                              formula: '∂L/∂W = ∂L/∂out · ∂out/∂W' },
+                            { icon: '⚡', name: 'Update', dim: '参数', op: 'AdamW', param: 'lr=1e-4', color: '#84cc16',
+                              desc: '更新参数',
+                              detail: '优化器更新模型参数',
+                              formula: 'θ = θ - η · ∇L' },
+                            { icon: '🔄', name: '继续', dim: '-', op: '循环', param: '-', color: '#6366f1',
+                              desc: '下一批次',
+                              detail: '加载下一个 batch 继续训练' }
+                        ]
+                    }
+                ]
+            },
+
+            // SFT
+            sft: {
+                name: 'SFT 微调',
+                groups: [
+                    {
+                        label: '数据',
+                        steps: [
+                            { icon: '📋', name: '指令数据', dim: '(Q,A)', op: '加载', param: '-', color: '#3b82f6',
+                              desc: '指令-回答配对',
+                              detail: '高质量指令数据集' },
+                            { icon: '📝', name: '格式化', dim: '对话', op: '模板', param: '-', color: '#8b5cf6',
+                              desc: '构造对话格式',
+                              detail: '<<HUMAN>>: Q <<ASSISTANT>>: A' },
+                            { icon: '🔤', name: '分词', dim: '[L]', op: '编码', param: '-', color: '#06b6d4',
+                              desc: '文本→ID',
+                              detail: '将对话转换为 token 序列' }
+                        ]
+                    },
+                    {
+                        label: '掩码',
+                        steps: [
+                            { icon: '🎭', name: 'Label Mask', dim: '[L]', op: '掩码', param: '-', color: '#ec4899',
+                              desc: '标签掩码',
+                              detail: '指令部分设为 -100，只计算回答部分损失' }
+                        ]
+                    },
+                    {
+                        label: '训练',
+                        steps: [
+                            { icon: '➡️', name: 'Forward', dim: '[L,V]', op: '前向', param: '预训练权重', color: '#f59e0b',
+                              desc: '前向传播',
+                              detail: '使用预训练权重初始化' },
+                            { icon: '📉', name: 'Masked Loss', dim: '标量', op: 'CE', param: '-', color: '#ef4444',
+                              desc: '掩码损失',
+                              detail: '只对回答部分计算损失' },
+                            { icon: '⬅️', name: 'Backward', dim: '梯度', op: '反向', param: '-', color: '#f97316',
+                              desc: '反向传播',
+                              detail: '计算梯度' },
+                            { icon: '⚡', name: 'Update', dim: '参数', op: 'AdamW', param: 'lr=1e-5', color: '#84cc16',
+                              desc: '微调更新',
+                              detail: '小学习率微调，避免破坏预训练知识' },
+                            { icon: '🔄', name: '继续', dim: '-', op: '循环', param: '-', color: '#6366f1',
+                              desc: '下一批',
+                              detail: '继续训练下一个指令' }
+                        ]
+                    }
+                ]
+            },
+
+            // LoRA
+            lora: {
+                name: 'LoRA 微调',
+                groups: [
+                    {
+                        label: '结构',
+                        steps: [
+                            { icon: '🏗️', name: '基座模型', dim: 'W', op: '冻结', param: '7B params', color: '#3b82f6',
+                              desc: '预训练模型(冻结)',
+                              detail: '固定预训练权重 W₀，不参与训练' }
+                        ]
+                    },
+                    {
+                        label: 'LoRA',
+                        steps: [
+                            { icon: '⬇️', name: 'LoRA A', dim: 'R×D', op: '降维', param: 'r=8', color: '#f59e0b',
+                              desc: '低秩矩阵 A',
+                              detail: 'D 维 → r 维，参数量极少',
+                              formula: 'A ∈ R^{r×D}, r≪D' },
+                            { icon: '⬆️', name: 'LoRA B', dim: 'D×R', op: '升维', param: 'r=8', color: '#ec4899',
+                              desc: '低秩矩阵 B',
+                              detail: 'r 维 → D 维，初始化为 0',
+                              formula: 'B ∈ R^{D×r}, 初始化=0' },
+                            { icon: '🔗', name: '合并', dim: 'D×D', op: 'W=W₀+αBA', param: 'α=16', color: '#10b981',
+                              desc: '权重合并',
+                              detail: '推理时可将 LoRA 合并到原权重',
+                              formula: 'W = W₀ + α · B · A' }
+                        ]
+                    },
+                    {
+                        label: '训练',
+                        steps: [
+                            { icon: '➡️', name: 'Forward', dim: '[L,V]', op: '前向', param: '-', color: '#06b6d4',
+                              desc: '前向传播',
+                              detail: '使用合并后的权重计算' },
+                            { icon: '📉', name: 'Loss', dim: '标量', op: 'CE', param: '-', color: '#ef4444',
+                              desc: '计算损失',
+                              detail: '预测与标签的交叉熵' },
+                            { icon: '⬅️', name: 'Backward', dim: '梯度', op: '反向', param: '只训练A,B', color: '#f97316',
+                              desc: '反向传播',
+                              detail: '只计算 A、B 的梯度，W₀ 冻结' },
+                            { icon: '⚡', name: 'Update', dim: 'A,B', op: '更新', param: '0.1%参数', color: '#84cc16',
+                              desc: '更新 LoRA',
+                              detail: '只需训练原模型 0.1% 参数' }
+                        ]
+                    },
+                    {
+                        label: '优势',
+                        steps: [
+                            { icon: '💾', name: '显存节省', dim: '-', op: '-', param: '↓75%', color: '#a855f7',
+                              desc: '大幅降低显存',
+                              detail: '7B 模型: 28GB → 7GB' },
+                            { icon: '🚀', name: '训练加速', dim: '-', op: '-', param: '↑3x', color: '#06b6d4',
+                              desc: '训练速度提升',
+                              detail: '参数少，梯度计算快' }
+                        ]
+                    }
+                ]
+            },
+
+            // DPO
+            dpo: {
+                name: 'DPO 偏好优化',
+                groups: [
+                    {
+                        label: '数据',
+                        steps: [
+                            { icon: '💬', name: 'Prompt', dim: 'x', op: '问题', param: '-', color: '#8b5cf6',
+                              desc: '用户问题',
+                              detail: '同一个问题，有多个候选回答' },
+                            { icon: '👍', name: 'Chosen', dim: 'y_w', op: '优质', param: '-', color: '#10b981',
+                              desc: '人类选择的优质回答',
+                              detail: '人类标注认为更好的回答' },
+                            { icon: '👎', name: 'Rejected', dim: 'y_l', op: '劣质', param: '-', color: '#ef4444',
+                              desc: '人类拒绝的劣质回答',
+                              detail: '人类标注认为较差的回答' }
+                        ]
+                    },
+                    {
+                        label: '模型',
+                        steps: [
+                            { icon: '🤖', name: 'Policy π_θ', dim: '模型', op: '推理', param: '待优化', color: '#f59e0b',
+                              desc: '当前策略模型',
+                              detail: '需要优化的模型，计算 chosen/rejected 的概率' },
+                            { icon: '📚', name: 'Reference π_ref', dim: '模型', op: '推理', param: '冻结', color: '#06b6d4',
+                              desc: '参考模型(冻结)',
+                              detail: 'SFT 后的模型冻结，作为参考基准' }
+                        ]
+                    },
+                    {
+                        label: '计算',
+                        steps: [
+                            { icon: '📊', name: 'Log Prob', dim: 'log p', op: '计算', param: '-', color: '#ec4899',
+                              desc: '计算对数概率',
+                              detail: '分别计算 chosen 和 rejected 的对数概率',
+                              formula: 'log π(y|x)' },
+                            { icon: '➗', name: 'Log Ratio', dim: 'Δ', op: '比较', param: 'β=0.1', color: '#a855f7',
+                              desc: '计算概率差',
+                              detail: '比较 policy 和 reference 的概率差异',
+                              formula: 'Δ = (log π_θ - log π_ref)' },
+                            { icon: '📉', name: 'DPO Loss', dim: '标量', op: '优化', param: '-', color: '#ef4444',
+                              desc: 'DPO 损失',
+                              detail: '最大化 chosen 与 rejected 的概率差',
+                              formula: 'L = -log σ(β(Δ_w - Δ_l))' }
+                        ]
+                    },
+                    {
+                        label: '更新',
+                        steps: [
+                            { icon: '⚡', name: 'Update', dim: '参数', op: '梯度下降', param: '-', color: '#84cc16',
+                              desc: '更新策略模型',
+                              detail: '通过梯度下降优化，使模型更倾向于生成 chosen 类型的回答' },
+                            { icon: '✨', name: '对齐', dim: '-', op: '-', param: '人类偏好', color: '#6366f1',
+                              desc: '偏好对齐',
+                              detail: '模型学会生成更符合人类偏好的回答' }
+                        ]
+                    }
+                ]
+            },
+
+            // GRPO
+            grpo: {
+                name: 'GRPO 强化学习',
+                groups: [
+                    {
+                        label: '采样',
+                        steps: [
+                            { icon: '💬', name: 'Prompt', dim: 'x', op: '问题', param: '-', color: '#8b5cf6',
+                              desc: '用户问题',
+                              detail: '待生成回答的问题' },
+                            { icon: '🎲', name: '采样', dim: 'y₁...yₖ', op: '生成', param: 'k=4', color: '#06b6d4',
+                              desc: '生成多个回答',
+                              detail: '从当前模型采样 k 个候选回答' }
+                        ]
+                    },
+                    {
+                        label: '评分',
+                        steps: [
+                            { icon: '⚖️', name: 'Reward Model', dim: 'r(y)', op: '打分', param: '-', color: '#f59e0b',
+                              desc: '奖励模型打分',
+                              detail: '对每个候选回答进行评分' },
+                            { icon: '📊', name: '归一化', dim: 'A(y)', op: '计算优势', param: '-', color: '#ec4899',
+                              desc: '计算相对优势',
+                              detail: '相对于组内平均的优势',
+                              formula: 'A(y) = (r(y) - mean) / std' }
+                        ]
+                    },
+                    {
+                        label: '优化',
+                        steps: [
+                            { icon: '🎯', name: 'Policy Loss', dim: 'L_policy', op: '策略梯度', param: '-', color: '#ef4444',
+                              desc: '策略损失',
+                              detail: '鼓励高分回答，惩罚低分回答',
+                              formula: 'L = -A(y) · log π(y|x)' },
+                            { icon: '📏', name: 'KL Penality', dim: 'L_kl', op: '约束', param: '-', color: '#f97316',
+                              desc: 'KL 散度约束',
+                              detail: '防止模型偏离太远',
+                              formula: 'KL = π_θ · log(π_θ/π_ref)' },
+                            { icon: '📉', name: 'Total Loss', dim: 'L', op: '总损失', param: '-', color: '#a855f7',
+                              desc: '总损失',
+                              detail: '策略损失 + KL 约束',
+                              formula: 'L = L_policy + β·L_kl' }
+                        ]
+                    },
+                    {
+                        label: '更新',
+                        steps: [
+                            { icon: '⬅️', name: 'Backward', dim: '梯度', op: '反向', param: '-', color: '#f97316',
+                              desc: '反向传播',
+                              detail: '计算梯度' },
+                            { icon: '⚡', name: 'Update', dim: '参数', op: '更新', param: '-', color: '#84cc16',
+                              desc: '更新策略',
+                              detail: '优化模型，使其生成更高分的回答' },
+                            { icon: '🔄', name: '继续', dim: '-', op: '循环', param: '-', color: '#6366f1',
+                              desc: '下一轮',
+                              detail: '继续采样、评分、优化' }
+                        ]
+                    }
+                ]
+            },
+
+            // RAG
+            rag: {
+                name: 'RAG 检索增强',
+                groups: [
+                    {
+                        label: '查询',
+                        steps: [
+                            { icon: '💬', name: '用户问题', dim: 'text', op: '输入', param: '-', color: '#3b82f6',
+                              desc: '用户输入问题',
+                              detail: '自然语言问题' },
+                            { icon: '📝', name: 'Query Embed', dim: '[768]', op: '向量化', param: '-', color: '#8b5cf6',
+                              desc: '问题向量化',
+                              detail: '将问题转换为向量表示' }
+                        ]
+                    },
+                    {
+                        label: '检索',
+                        steps: [
+                            { icon: '📚', name: 'Vector DB', dim: '向量库', op: '存储', param: '-', color: '#06b6d4',
+                              desc: '向量数据库',
+                              detail: '存储文档的向量表示' },
+                            { icon: '🔍', name: '相似度搜索', dim: 'Top-K', op: '检索', param: 'k=5', color: '#10b981',
+                              desc: '相似度搜索',
+                              detail: '找出与问题最相似的文档',
+                              formula: 'sim(q, d) = cos(q, d)' },
+                            { icon: '📄', name: '检索结果', dim: '[k docs]', op: '返回', param: '-', color: '#f59e0b',
+                              desc: '检索到的文档',
+                              detail: '返回最相关的 k 个文档片段' }
+                        ]
+                    },
+                    {
+                        label: '增强',
+                        steps: [
+                            { icon: '🔧', name: 'Rerank', dim: '排序', op: '重排', param: '-', color: '#ec4899',
+                              desc: '重排序',
+                              detail: '对检索结果进行精细排序' },
+                            { icon: '📝', name: '构建 Prompt', dim: '提示词', op: '组装', param: '-', color: '#a855f7',
+                              desc: '构建提示词',
+                              detail: '将问题和检索文档组装成提示词',
+                              formula: 'prompt = Q + retrieved_docs' }
+                        ]
+                    },
+                    {
+                        label: '生成',
+                        steps: [
+                            { icon: '🤖', name: 'LLM 生成', dim: 'answer', op: '推理', param: '-', color: '#ef4444',
+                              desc: '大模型生成',
+                              detail: '基于检索文档生成回答' },
+                            { icon: '✅', name: '引用标注', dim: '引用', op: '标注', param: '-', color: '#84cc16',
+                              desc: '标注引用来源',
+                              detail: '标注回答中引用的文档来源' },
+                            { icon: '✨', name: '输出答案', dim: 'text', op: '输出', param: '-', color: '#6366f1',
+                              desc: '最终答案',
+                              detail: '输出基于事实的回答' }
+                        ]
+                    }
+                ]
+            }
+        };
+
+        // ==================== 控制器 ====================
+        class FlowController {
+            constructor() {
+                this.mode = 'inference';
+                this.flow = FLOWS[this.mode];
+                this.idx = -1;
+                this.steps = [];
+                this.playing = false;
+                this.speed = 1;
+                this.timers = [];
+                this.generated = [];
+                this.tokens = ['今', '天', '天', '气', '很', '好'];
+                
+                this.init();
+            }
+
+            init() {
+                this.flattenSteps();
+                this.render();
+                this.bindEvents();
+            }
+
+            flattenSteps() {
+                this.steps = [];
+                this.flow.groups.forEach(g => {
+                    g.steps.forEach(s => {
+                        s.groupLabel = g.label;
+                        s.inLoop = g.loop;
+                    });
+                    this.steps.push(...g.steps);
+                });
+            }
+
+            render() {
+                this.flow = FLOWS[this.mode];
+                this.flattenSteps();
+                this.idx = -1;
+                this.generated = [];
+
+                let html = '<div class="flow-container">';
+                
+                this.flow.groups.forEach((group, gi) => {
+                    html += `<div class="step-row" style="position: relative;">`;
+                    html += `<div class="group-label">${group.label}</div>`;
+                    
+                    if (group.loop) {
+                        html += `<div class="loop-box">`;
+                        html += `<div class="loop-tag">🔁 ${group.loopText}</div>`;
+                    }
+                    
+                    group.steps.forEach((step, si) => {
+                        const globalIdx = this.getGlobalIdx(gi, si);
+                        
+                        if (si > 0) {
+                            html += `<div class="arrow-right" data-idx="${globalIdx - 1}"></div>`;
+                        }
+                        
+                        html += `<div class="step-box" data-idx="${globalIdx}" style="border-color: ${step.color}50;">
+                            <div class="icon">${step.icon}</div>
+                            <div class="name">${step.name}</div>
+                            <div class="dim">${step.dim}</div>
+                        </div>`;
+                    });
+                    
+                    if (group.loop) {
+                        html += `</div>`;
+                    }
+                    
+                    html += `</div>`;
+                    
+                    if (gi < this.flow.groups.length - 1) {
+                        let prevSteps = 0;
+                        for (let i = 0; i <= gi; i++) {
+                            prevSteps += this.flow.groups[i].steps.length;
+                        }
+                        html += `<div class="arrow-down" data-idx="${prevSteps - 1}"></div>`;
+                    }
+                });
+                
+                html += '</div>';
+                document.getElementById('vizPanel').innerHTML = html;
+                
+                this.updateUI();
+                
+                document.getElementById('tokensBox').classList.toggle('show', this.mode === 'inference');
+            }
+
+            getGlobalIdx(groupIdx, stepIdx) {
+                let idx = 0;
+                for (let i = 0; i < groupIdx; i++) {
+                    idx += this.flow.groups[i].steps.length;
+                }
+                return idx + stepIdx;
+            }
+
+            bindEvents() {
+                document.querySelectorAll('.mode-tab').forEach(tab => {
+                    tab.addEventListener('click', () => {
+                        document.querySelectorAll('.mode-tab').forEach(t => t.classList.remove('active'));
+                        tab.classList.add('active');
+                        this.mode = tab.dataset.mode;
+                        this.render();
+                    });
+                });
+
+                document.getElementById('playBtn').addEventListener('click', () => {
+                    this.playing ? this.pause() : this.play();
+                });
+                document.getElementById('prevBtn').addEventListener('click', () => { this.pause(); this.prev(); });
+                document.getElementById('nextBtn').addEventListener('click', () => { this.pause(); this.next(); });
+                document.getElementById('resetBtn').addEventListener('click', () => this.reset());
+
+                document.querySelectorAll('.spd-btn').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        document.querySelectorAll('.spd-btn').forEach(b => b.classList.remove('active'));
+                        btn.classList.add('active');
+                        this.speed = parseFloat(btn.dataset.speed);
+                    });
+                });
+
+                document.getElementById('vizPanel').addEventListener('click', e => {
+                    const box = e.target.closest('.step-box');
+                    if (box) {
+                        const idx = parseInt(box.dataset.idx);
+                        this.pause();
+                        this.goTo(idx);
+                    }
+                });
+
+                document.addEventListener('keydown', e => {
+                    if (e.key === ' ') { e.preventDefault(); this.playing ? this.pause() : this.play(); }
+                    else if (e.key === 'ArrowLeft') { e.preventDefault(); this.pause(); this.prev(); }
+                    else if (e.key === 'ArrowRight') { e.preventDefault(); this.pause(); this.next(); }
+                    else if (e.key.toLowerCase() === 'r') { e.preventDefault(); this.reset(); }
+                });
+            }
+
+            play() {
+                if (this.playing) return;
+                this.playing = true;
+                document.getElementById('playBtn').textContent = '⏸';
+                document.getElementById('playBtn').classList.add('playing');
+                this.run();
+            }
+
+            pause() {
+                this.playing = false;
+                this.timers.forEach(t => clearTimeout(t));
+                this.timers = [];
+                document.getElementById('playBtn').textContent = '▶';
+                document.getElementById('playBtn').classList.remove('playing');
+            }
+
+            reset() {
+                this.pause();
+                this.idx = -1;
+                this.generated = [];
+                this.updateUI();
+                document.getElementById('animInfo').classList.remove('show');
+                document.getElementById('tokCount').textContent = '0';
+                document.getElementById('curTok').textContent = '-';
+            }
+
+            prev() {
+                if (this.idx > 0) this.goTo(this.idx - 1);
+            }
+
+            next() {
+                if (this.idx < this.steps.length - 1) this.goTo(this.idx + 1);
+            }
+
+            goTo(i) {
+                this.idx = i;
+                this.updateUI();
+            }
+
+            async run() {
+                while (this.playing && this.idx < this.steps.length - 1) {
+                    this.idx++;
+                    this.updateUI();
+                    await this.delay(this.getDelay());
+                }
+
+                if (this.mode === 'inference' && this.playing && this.idx >= this.steps.length - 1) {
+                    const step = this.steps[this.idx];
+                    if (step && step.name === '检查结束') {
+                        if (this.generated.length < this.tokens.length) {
+                            const tok = this.tokens[this.generated.length];
+                            this.generated.push(tok);
+                            document.getElementById('tokCount').textContent = this.generated.length;
+                            document.getElementById('curTok').textContent = `"${tok}"`;
+                            this.showAnim('✨ 生成 Token', `已生成第 ${this.generated.length} 个: "${tok}"`);
+                            
+                            await this.delay(400);
+                            const attnIdx = this.steps.findIndex(s => s.name === 'Attention');
+                            if (attnIdx >= 0) {
+                                this.idx = attnIdx - 1;
+                                this.updateUI();
+                            }
+                        } else {
+                            this.showFinal();
+                            this.pause();
+                        }
+                    }
+                }
+
+                if (this.mode !== 'inference' && this.playing && this.idx >= this.steps.length - 1) {
+                    this.showAnim('🔄 训练迭代', '完成一轮，继续下一批次...');
+                    await this.delay(500);
+                    this.idx = -1;
+                    this.updateUI();
+                }
+            }
+
+            getDelay() {
+                const step = this.steps[this.idx];
+                if (step?.inLoop) return 700 / this.speed;
+                return 450 / this.speed;
+            }
+
+            delay(ms) {
+                return new Promise(resolve => {
+                    const t = setTimeout(resolve, ms);
+                    this.timers.push(t);
+                });
+            }
+
+            updateUI() {
+                document.querySelectorAll('.step-box').forEach(box => {
+                    const i = parseInt(box.dataset.idx);
+                    box.classList.remove('active', 'completed');
+                    if (i < this.idx) box.classList.add('completed');
+                    else if (i === this.idx) box.classList.add('active');
+                });
+
+                document.querySelectorAll('.arrow-down, .arrow-right').forEach(arr => {
+                    const i = parseInt(arr.dataset.idx);
+                    arr.classList.remove('active', 'done');
+                    if (i < this.idx) arr.classList.add('done');
+                    else if (i === this.idx) arr.classList.add('active');
+                });
+
+                const total = this.steps.length;
+                const current = this.idx + 1;
+                const pct = total > 0 ? (current / total) * 100 : 0;
+                document.getElementById('progressBar').style.width = `${pct}%`;
+                document.getElementById('progressText').textContent = `步骤 ${Math.max(0, current)} / ${total}`;
+
+                document.getElementById('prevBtn').disabled = this.idx <= 0;
+                document.getElementById('nextBtn').disabled = this.idx >= total - 1;
+
+                const step = this.steps[this.idx];
+                if (step) {
+                    document.getElementById('infoIcon').textContent = step.icon;
+                    document.getElementById('infoName').textContent = step.name;
+                    document.getElementById('infoDesc').textContent = step.desc;
+                    document.getElementById('metricDim').textContent = step.dim;
+                    document.getElementById('metricOp').textContent = step.op;
+                    document.getElementById('metricParam').textContent = step.param;
+
+                    let html = step.detail;
+                    if (step.formula) {
+                        html += `<div class="formula">${step.formula}</div>`;
+                    }
+                    document.getElementById('infoText').innerHTML = html;
+                } else {
+                    document.getElementById('infoIcon').textContent = '💡';
+                    document.getElementById('infoName').textContent = '选择模式开始';
+                    document.getElementById('infoDesc').textContent = '点击播放按钮开始';
+                    document.getElementById('metricDim').textContent = '-';
+                    document.getElementById('metricOp').textContent = '-';
+                    document.getElementById('metricParam').textContent = '-';
+                    document.getElementById('infoText').textContent = '选择模式后点击播放按钮。';
+                }
+            }
+
+            showAnim(title, text) {
+                document.getElementById('animTitle').textContent = title;
+                document.getElementById('animText').textContent = text;
+                document.getElementById('animInfo').classList.add('show');
+            }
+
+            showFinal() {
+                const text = this.generated.join('');
+                document.getElementById('infoText').innerHTML = `
+                    <h4>🎉 生成完成</h4>
+                    <p>输出: <strong style="color: var(--success); font-size: 1.1em;">"${text}"</strong></p>
+                    <p style="margin-top: 10px;">共 <span style="background: linear-gradient(135deg, var(--primary), var(--secondary)); color: #000; padding: 2px 10px; border-radius: 4px; font-weight: bold;">${this.generated.length}</span> 个 token</p>
+                `;
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            window.ctrl = new FlowController();
+        });
+    </script>
+</body>
+</html>

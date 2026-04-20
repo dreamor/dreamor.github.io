@@ -1,0 +1,841 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RAG 生成阶段 (Generate) - MiniMind 学习</title>
+    <link rel="stylesheet" href="styles/common.css">
+    <style>
+        /* 页面特定样式 */
+        .gen-flow-container {
+            background: rgba(0,0,0,0.2);
+            border-radius: 16px;
+            padding: 30px;
+            margin: 25px 0;
+        }
+
+        .flow-steps {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 10px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+
+        .flow-step {
+            flex: 1;
+            min-width: 150px;
+            text-align: center;
+            padding: 20px 15px;
+            background: var(--bg-card);
+            border-radius: 12px;
+            border: 2px solid transparent;
+            transition: all 0.4s ease;
+            position: relative;
+        }
+
+        .flow-step.active {
+            border-color: var(--primary);
+            background: rgba(0, 212, 255, 0.1);
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0, 212, 255, 0.2);
+        }
+
+        .flow-step.completed {
+            border-color: var(--success);
+            background: rgba(16, 185, 129, 0.1);
+        }
+
+        .step-num {
+            width: 36px;
+            height: 36px;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin: 0 auto 12px;
+            font-size: 1.1em;
+        }
+
+        .flow-step.active .step-num {
+            animation: pulse-glow 1.5s infinite;
+        }
+
+        @keyframes pulse-glow {
+            0%, 100% { box-shadow: 0 0 10px rgba(0, 212, 255, 0.5); }
+            50% { box-shadow: 0 0 25px rgba(0, 212, 255, 0.8); }
+        }
+
+        .step-title {
+            font-size: 0.95em;
+            font-weight: bold;
+            color: var(--text-primary);
+            margin-bottom: 8px;
+        }
+
+        .step-desc {
+            font-size: 0.8em;
+            color: var(--text-secondary);
+            line-height: 1.4;
+        }
+
+        .flow-arrow {
+            color: var(--primary);
+            font-size: 1.5em;
+            flex-shrink: 0;
+            align-self: center;
+        }
+
+        /* 步骤数据展示区 */
+        .step-data-display {
+            background: #0d0d15;
+            border-radius: 12px;
+            padding: 25px;
+            margin-top: 20px;
+            min-height: 150px;
+            border: 1px solid var(--border);
+        }
+
+        .data-label {
+            font-size: 0.85em;
+            color: var(--text-muted);
+            margin-bottom: 10px;
+        }
+
+        .data-content {
+            font-family: 'Courier New', monospace;
+            background: rgba(0,0,0,0.3);
+            padding: 15px;
+            border-radius: 8px;
+            font-size: 0.9em;
+            line-height: 1.6;
+            color: var(--primary);
+            white-space: pre-wrap;
+            word-break: break-all;
+            transition: all 0.3s ease;
+        }
+
+        .data-content.tokenize { color: #ffe66d; }
+        .data-content.embedding { color: #7c3aed; }
+        .data-content.position { color: #10b981; }
+        .data-content.transformer { color: #f59e0b; }
+        .data-content.generate { color: #00d4ff; }
+
+        .btn-group-center {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-top: 25px;
+        }
+
+        /* 幻觉检测 */
+        .hallucination-demo {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 25px;
+            margin: 20px 0;
+        }
+
+        @media (max-width: 768px) {
+            .hallucination-demo {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .answer-panel, .source-panel {
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 20px;
+        }
+
+        .answer-sentence {
+            padding: 8px 12px;
+            margin: 6px 0;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s;
+            border-left: 3px solid transparent;
+        }
+
+        .answer-sentence:hover {
+            background: rgba(0,0,0,0.3);
+        }
+
+        .answer-sentence.correct {
+            border-left-color: var(--success);
+            background: rgba(16, 185, 129, 0.1);
+        }
+
+        .answer-sentence.hallucination {
+            border-left-color: var(--danger);
+            background: rgba(239, 68, 68, 0.1);
+        }
+
+        .answer-sentence .badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.75em;
+            margin-left: 8px;
+        }
+
+        .answer-sentence.correct .badge {
+            background: var(--success);
+            color: white;
+        }
+
+        .answer-sentence.hallucination .badge {
+            background: var(--danger);
+            color: white;
+        }
+
+        .source-doc {
+            padding: 12px 15px;
+            margin: 8px 0;
+            background: rgba(0,0,0,0.2);
+            border-radius: 8px;
+            border-left: 3px solid var(--border);
+            transition: all 0.3s;
+        }
+
+        .source-doc.highlight {
+            border-left-color: var(--primary);
+            background: rgba(0, 212, 255, 0.1);
+            transform: translateX(5px);
+        }
+
+        .source-doc .doc-id {
+            font-size: 0.8em;
+            color: var(--text-muted);
+            margin-bottom: 5px;
+        }
+
+        /* 计算器 */
+        .calculator {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+
+        .calc-input {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .calc-input label {
+            font-size: 0.9em;
+            color: var(--text-secondary);
+        }
+
+        .calc-input input {
+            padding: 12px 15px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: var(--bg-dark);
+            color: var(--text-primary);
+            font-size: 1.1em;
+            text-align: center;
+        }
+
+        .calc-input input:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        .calc-results {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .calc-result {
+            text-align: center;
+            padding: 20px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 12px;
+        }
+
+        .calc-result .value {
+            font-size: 2em;
+            font-weight: bold;
+            color: var(--primary);
+        }
+
+        .calc-result .label {
+            font-size: 0.85em;
+            color: var(--text-muted);
+            margin-top: 5px;
+        }
+
+        /* 失败场景卡片 */
+        .failure-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+
+        .failure-card {
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 25px;
+            border-top: 3px solid var(--danger);
+        }
+
+        .failure-card .scenario-title {
+            font-size: 1.1em;
+            font-weight: bold;
+            color: var(--danger);
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .failure-card .scenario-desc {
+            font-size: 0.9em;
+            color: var(--text-secondary);
+            line-height: 1.6;
+        }
+
+        /* 指标说明卡片 */
+        .metric-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        .metric-card {
+            background: var(--bg-card);
+            border-radius: 10px;
+            padding: 18px;
+            border-left: 3px solid var(--primary);
+        }
+
+        .metric-card .metric-name {
+            font-weight: bold;
+            color: var(--primary);
+            margin-bottom: 6px;
+        }
+
+        .metric-card .metric-desc {
+            font-size: 0.85em;
+            color: var(--text-secondary);
+        }
+
+        /* Prompt 展示 */
+        .prompt-demo {
+            background: #0d0d15;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 15px 0;
+        }
+
+        .prompt-line {
+            padding: 4px 0;
+            font-family: monospace;
+            font-size: 0.9em;
+        }
+
+        .prompt-line.system { color: #ef4444; }
+        .prompt-line.context { color: #10b981; }
+        .prompt-line.query { color: #00d4ff; }
+    </style>
+</head>
+<body>
+    <!-- 导航栏 -->
+    <nav class="navbar">
+        <div class="container">
+            <a href="index.html" class="logo">
+                <div class="logo-icon">🧠</div>
+                <span>MiniMind 学习</span>
+            </a>
+            <div class="nav-links">
+                <a href="index.html" class="nav-link">首页</a>
+                <a href="tokenization.html" class="nav-link">分词</a>
+                <a href="embedding.html" class="nav-link">词嵌入</a>
+                <a href="position.html" class="nav-link">位置编码</a>
+                <a href="attention.html" class="nav-link">注意力</a>
+                <a href="precision.html" class="nav-link">精度量化</a>
+                <a href="forward.html" class="nav-link">前馈网络</a>
+                <a href="model_architecture.html" class="nav-link">模型架构</a>
+                <a href="moe.html" class="nav-link">MoE</a>
+                <a href="pretrain.html" class="nav-link">预训练</a>
+                <a href="sft.html" class="nav-link">SFT</a>
+                <a href="lora.html" class="nav-link">LoRA</a>
+                <a href="dpo.html" class="nav-link">DPO</a>
+                <a href="grpo.html" class="nav-link">GRPO</a>
+                <a href="inference.html" class="nav-link">推理</a>
+                <a href="rag_retrieval.html" class="nav-link">RAG 检索</a>
+                <a href="rag_augment.html" class="nav-link">RAG 增强</a>
+                <a href="rag_generation.html" class="nav-link active">RAG 生成</a>
+                <a href="rag_pipeline.html" class="nav-link">RAG 流程</a>
+                <a href="full_pipeline.html" class="nav-link" style="color: var(--accent);">全流程</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <!-- 页面标题 -->
+        <div class="page-header">
+            <h1 class="page-title">🤖 RAG 生成阶段 (Generate)</h1>
+            <p class="page-subtitle">LLM 如何基于检索到的知识"写出"答案？</p>
+        </div>
+
+        <!-- 核心问题概念框 -->
+        <div class="content-card">
+            <h3>🎯 核心问题</h3>
+            <p>检索已经拿到了"参考资料"，接下来 LLM 如何利用这些资料生成正确答案？</p>
+
+            <div class="concept-box">
+                <div class="concept-title">📚 类比：开卷考试</div>
+                <p>想象你参加一场开卷考试：</p>
+                <ul style="color:#ccc; margin:10px 0; padding-left:20px; line-height:2;">
+                    <li><strong>纯记忆生成</strong> = 考试前没复习，完全靠蒙（瞎编）</li>
+                    <li><strong>带上下文生成</strong> = 考试时可以翻书，根据书上的内容组织答案</li>
+                </ul>
+                <p>RAG 的生成阶段就是"查书答题"的过程：模型不再是凭记忆编造，而是基于检索到的真实知识来组织答案。</p>
+                <div class="analogy">
+                    <div class="analogy-title">🔑 核心区别</div>
+                    <p>检索阶段找到"答案可能在哪些页"<br>
+                    生成阶段从这些页面中"提炼、整理、输出"正确答案</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 带上下文的生成流程 -->
+        <div class="content-card">
+            <h3>⚙️ 带上下文的生成流程</h3>
+            <p>点击"下一步"按钮，逐步观察 Token 如何经过一步步处理，最终生成回答：</p>
+
+            <div class="gen-flow-container">
+                <div class="flow-steps">
+                    <div class="flow-step active" id="step-1">
+                        <div class="step-num">1</div>
+                        <div class="step-title">组装 Prompt</div>
+                        <div class="step-desc">系统指令 + 检索上下文 + 用户问题</div>
+                    </div>
+                    <div class="flow-arrow">→</div>
+                    <div class="flow-step" id="step-2">
+                        <div class="step-num">2</div>
+                        <div class="step-title">Tokenize</div>
+                        <div class="step-desc">文字 → Token IDs</div>
+                    </div>
+                    <div class="flow-arrow">→</div>
+                    <div class="flow-step" id="step-3">
+                        <div class="step-num">3</div>
+                        <div class="step-title">Embedding</div>
+                        <div class="step-desc">IDs → 向量</div>
+                    </div>
+                    <div class="flow-arrow">→</div>
+                    <div class="flow-step" id="step-4">
+                        <div class="step-num">4</div>
+                        <div class="step-title">位置编码</div>
+                        <div class="step-desc">RoPE 旋转编码</div>
+                    </div>
+                    <div class="flow-arrow">→</div>
+                    <div class="flow-step" id="step-5">
+                        <div class="step-num">5</div>
+                        <div class="step-title">Transformer</div>
+                        <div class="step-desc">多层注意力 + FFN</div>
+                    </div>
+                    <div class="flow-arrow">→</div>
+                    <div class="flow-step" id="step-6">
+                        <div class="step-num">6</div>
+                        <div class="step-title">自回归生成</div>
+                        <div class="step-desc">逐 token 输出</div>
+                    </div>
+                </div>
+
+                <div class="step-data-display">
+                    <div class="data-label">当前数据状态：</div>
+                    <div class="data-content" id="dataContent">点击"下一步"开始演示...</div>
+                </div>
+
+                <div class="btn-group-center">
+                    <button class="btn btn-secondary" id="resetBtn" onclick="resetFlow()">🔄 重置</button>
+                    <button class="btn btn-primary" id="nextBtn" onclick="nextStep()">下一步 →</button>
+                </div>
+            </div>
+
+            <div class="concept-box" style="margin-top:20px;">
+                <div class="concept-title">💡 增强 Prompt 示例</div>
+                <div class="prompt-demo">
+                    <div class="prompt-line system">【系统】你是一个知识渊博的助手，基于给定的参考信息回答问题。</div>
+                    <div class="prompt-line context">【参考】根据 2024 年诺贝尔物理学奖授予了神经网络相关的突破性研究...</div>
+                    <div class="prompt-line context">【参考】AI 技术发展经历了三次浪潮，深度学习是第三次浪潮的核心...</div>
+                    <div class="prompt-line query">【问题】2024年诺贝尔物理学奖和 AI有什么关系？</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 幻觉检测交互 -->
+        <div class="content-card">
+            <h3>🔍 幻觉检测交互</h3>
+            <p>将鼠标悬停在答案的每句话上，查看它引用自哪个源文档（绿色=正确引用，红色=幻觉）：</p>
+
+            <div class="hallucination-demo">
+                <div class="answer-panel">
+                    <h4 style="color:var(--primary); margin-bottom:15px;">📝 生成的回答</h4>
+                    <div class="answer-sentence correct" data-source="doc-1">
+                        2024年诺贝尔物理学奖授予了神经网络领域的科学家。<span class="badge">✅ 正确</span>
+                    </div>
+                    <div class="answer-sentence correct" data-source="doc-2">
+                        深度学习是AI发展第三次浪潮的核心技术。<span class="badge">✅ 正确</span>
+                    </div>
+                    <div class="answer-sentence hallucination" data-source="none">
+                        诺贝尔文学奖也表彰了AI在文学创作方面的贡献。<span class="badge">❌ 幻觉</span>
+                    </div>
+                </div>
+                <div class="source-panel">
+                    <h4 style="color:var(--secondary); margin-bottom:15px;">📄 源文档</h4>
+                    <div class="source-doc" id="doc-1">
+                        <div class="doc-id">文档 1</div>
+                        2024年诺贝尔物理学奖授予了在神经网络方面做出突破性贡献的科学家。
+                    </div>
+                    <div class="source-doc" id="doc-2">
+                        <div class="doc-id">文档 2</div>
+                        AI技术发展经历了三次浪潮，深度学习是第三次浪潮的核心。
+                    </div>
+                    <div class="source-doc" id="doc-3">
+                        <div class="doc-id">文档 3</div>
+                        诺贝尔经济学奖表彰了AI在经济学建模中的应用。
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- RAG 评估指标 -->
+        <div class="content-card">
+            <h3>📊 RAG 评估指标</h3>
+
+            <div class="metric-cards">
+                <div class="metric-card">
+                    <div class="metric-name">Recall@K</div>
+                    <div class="metric-desc">检索到的相关文档占所有相关文档的比例。K 是检索返回的文档数量。</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-name">MRR</div>
+                    <div class="metric-desc">Mean Reciprocal Rank，第一个相关文档排名的倒数平均值。</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-name">Hit Rate@K</div>
+                    <div class="metric-desc">前 K 个结果中包含相关文档的比例。</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-name">Faithfulness</div>
+                    <div class="metric-desc">答案与检索上下文的忠实度，衡量生成内容是否基于检索结果。</div>
+                </div>
+            </div>
+
+            <div class="concept-box">
+                <div class="concept-title">🧮 检索评估计算器</div>
+                <p>输入检索结果数据，实时计算 Recall、Precision、F1：</p>
+
+                <div class="calculator">
+                    <div class="calc-input">
+                        <label>TP (真正例)</label>
+                        <input type="number" id="tp" value="80" min="0" oninput="calculateMetrics()">
+                    </div>
+                    <div class="calc-input">
+                        <label>FP (假正例)</label>
+                        <input type="number" id="fp" value="10" min="0" oninput="calculateMetrics()">
+                    </div>
+                    <div class="calc-input">
+                        <label>FN (假负例)</label>
+                        <input type="number" id="fn" value="20" min="0" oninput="calculateMetrics()">
+                    </div>
+                </div>
+
+                <div class="calc-results">
+                    <div class="calc-result">
+                        <div class="value" id="recallValue">0.80</div>
+                        <div class="label">Recall</div>
+                    </div>
+                    <div class="calc-result">
+                        <div class="value" id="precisionValue">0.89</div>
+                        <div class="label">Precision</div>
+                    </div>
+                    <div class="calc-result">
+                        <div class="value" id="f1Value">0.84</div>
+                        <div class="label">F1 Score</div>
+                    </div>
+                </div>
+
+                <div style="margin-top:15px; font-size:0.85em; color:var(--text-muted);">
+                    <strong>公式：</strong><br>
+                    Recall = TP / (TP + FN)<br>
+                    Precision = TP / (TP + FP)<br>
+                    F1 = 2 × Precision × Recall / (Precision + Recall)
+                </div>
+            </div>
+        </div>
+
+        <!-- RAG 何时失败 -->
+        <div class="content-card">
+            <h3>⚠️ RAG 何时失败</h3>
+            <p>了解 RAG 系统的三大失败场景，帮助你更好地设计和优化系统：</p>
+
+            <div class="failure-cards">
+                <div class="failure-card">
+                    <div class="scenario-title">💨 场景1：检索不到相关内容</div>
+                    <div class="scenario-desc">
+                        <strong>问题：</strong>用户问题与知识库中任何文档的语义都不匹配。<br><br>
+                        <strong>表现：</strong>检索返回空结果或完全不相关的文档。<br><br>
+                        <strong>后果：</strong>LLM 无法基于上下文生成，只能靠"幻觉"回答。
+                    </div>
+                </div>
+                <div class="failure-card">
+                    <div class="scenario-title">✂️ 场景2：上下文超出长度限制</div>
+                    <div class="scenario-desc">
+                        <strong>问题：</strong>检索返回的文档太多/太长，超过了 LLM 的上下文窗口。<br><br>
+                        <strong>表现：</strong>长文档被截断，早期内容被"遗忘"。<br><br>
+                        <strong>后果：</strong>答案不完整或关键信息丢失。
+                    </div>
+                </div>
+                <div class="failure-card">
+                    <div class="scenario-title">⚔️ 场景3：多文档信息冲突</div>
+                    <div class="scenario-desc">
+                        <strong>问题：</strong>多个源文档对同一问题有不同的答案。<br><br>
+                        <strong>表现：</strong>LLM 在不同信息之间"纠结"。<br><br>
+                        <strong>后果：</strong>生成的回答自相矛盾或含糊其辞。
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 代码示例 -->
+        <div class="content-card">
+            <h3>💻 RAG 生成代码示例</h3>
+            <div class="code-block">
+                <div class="code-title">rag_generate.py</div>
+<pre><span class="keyword">def</span> <span class="function">rag_generate</span>(query, retrieved_docs, llm_model, tokenizer):
+    <span class="comment"># 1. 组装增强 Prompt</span>
+    context = <span class="string">"\n"</span>.join(retrieved_docs)
+    prompt = <span class="string">f"""基于以下参考信息回答问题：
+
+参考信息：
+{context}
+
+问题：{query}
+答案："""</span>
+
+    <span class="comment"># 2. Tokenize</span>
+    inputs = tokenizer(prompt, return_tensors=<span class="string">"pt"</span>)
+
+    <span class="comment"># 3. 逐 token 自回归生成</span>
+    outputs = llm_model.<span class="function">generate</span>(
+        inputs[<span class="string">"input_ids"</span>],
+        max_new_tokens=<span class="number">256</span>,
+        do_sample=<span class="keyword">True</span>,
+        temperature=<span class="number">0.7</span>
+    )
+
+    <span class="comment"># 4. 解码</span>
+    response = tokenizer.<span class="function">decode</span>(outputs[<span class="number">0</span>], skip_special_tokens=<span class="keyword">True</span>)
+    <span class="keyword">return</span> response</pre>
+            </div>
+        </div>
+
+        <!-- 底部导航 -->
+        <div class="content-card" style="text-align: center;">
+            <div class="btn-group">
+                <a href="rag_augment.html" class="btn btn-secondary">← 上一页：RAG 增强</a>
+                <a href="rag_pipeline.html" class="btn btn-primary">下一页：RAG 流水线 →</a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 流程步骤状态
+        let currentStep = 1;
+        const totalSteps = 6;
+
+        const stepData = {
+            1: {
+                label: 'Step 1 - 组装增强 Prompt',
+                content: `【系统指令】
+你是一个知识渊博的助手，基于给定的参考信息回答问题。如果参考信息中没有相关内容，请如实回答"我不知道"。
+
+【检索上下文】
+文档1: 2024年诺贝尔物理学奖授予了在神经网络方面做出突破性贡献的科学家。
+文档2: AI技术发展经历了三次浪潮，深度学习是第三次浪潮的核心。
+
+【用户问题】
+2024年诺贝尔物理学奖和AI有什么关系？`,
+                class: ''
+            },
+            2: {
+                label: 'Step 2 - Tokenize (文字 → Token IDs)',
+                content: `Token IDs: [2, 352, 1842, 892, 1043, 3289, ...]
+         ↓
+   [ CLS ] [ 2 ] [ 352 ] [ 1842 ] ... [ 102 ] [ 103 ] [ EOS ]
+
+总 Token 数: 47`,
+                class: 'tokenize'
+            },
+            3: {
+                label: 'Step 3 - Embedding (Token IDs → 向量)',
+                content: `每个 Token ID 查嵌入表得到向量：
+
+Token  [ CLS ]  →  Embedding[2]  =  [0.12, -0.34, 0.78, ...]
+Token  [ 352  ]  →  Embedding[352] =  [-0.89, 0.56, 0.23, ...]
+Token  [ 1842 ]  →  Embedding[1842]=  [0.45, -0.12, 0.67, ...]
+...
+
+向量维度: 768 (隐藏层大小)`,
+                class: 'embedding'
+            },
+            4: {
+                label: 'Step 4 - 位置编码 (RoPE 旋转编码)',
+                content: `为每个位置添加旋转位置编码：
+
+Position 1: θ = m × (10000^(-2i/d))
+Position 2: θ = m × (10000^(-2i/d))
+...
+Position N: θ = m × (10000^(-2i/d))
+
+使用复数旋转实现相对位置感知
+特点：无需额外参数，支持超长上下文`,
+                class: 'position'
+            },
+            5: {
+                label: 'Step 5 - Transformer 前向传播',
+                content: `多层 Transformer Block 处理：
+
+Layer 1: Self-Attention + FFN → Norm
+Layer 2: Self-Attention + FFN → Norm
+...
+Layer N: Self-Attention + FFN → Norm
+
+每层包含：
+• 多头自注意力 (8/16 heads)
+• 残差连接
+• 层归一化
+• 前馈网络`,
+                class: 'transformer'
+            },
+            6: {
+                label: 'Step 6 - 自回归生成',
+                content: `逐 token 生成：
+
+[ CLS ] → "2024" (概率: 0.95)
+"2024" → "年"  (概率: 0.98)
+"年"   → "诺"  (概率: 0.92)
+...
+生成完成: [ EOS ]
+
+最终输出: "2024年诺贝尔物理学奖授予了在神经网络方面..."`,
+                class: 'generate'
+            }
+        };
+
+        function updateStep(step) {
+            // 更新步骤高亮
+            for (let i = 1; i <= totalSteps; i++) {
+                const stepEl = document.getElementById(`step-${i}`);
+                stepEl.classList.remove('active', 'completed');
+                if (i < step) {
+                    stepEl.classList.add('completed');
+                } else if (i === step) {
+                    stepEl.classList.add('active');
+                }
+            }
+
+            // 更新数据展示
+            const dataContent = document.getElementById('dataContent');
+            const data = stepData[step];
+            dataContent.textContent = data.content;
+            dataContent.className = 'data-content ' + data.class;
+
+            // 更新按钮状态
+            const nextBtn = document.getElementById('nextBtn');
+            if (step >= totalSteps) {
+                nextBtn.textContent = '已完成 ✓';
+                nextBtn.disabled = true;
+            } else {
+                nextBtn.textContent = '下一步 →';
+                nextBtn.disabled = false;
+            }
+        }
+
+        function nextStep() {
+            if (currentStep < totalSteps) {
+                currentStep++;
+                updateStep(currentStep);
+            }
+        }
+
+        function resetFlow() {
+            currentStep = 1;
+            updateStep(currentStep);
+            document.getElementById('nextBtn').disabled = false;
+            document.getElementById('nextBtn').textContent = '下一步 →';
+        }
+
+        // 幻觉检测 - 鼠标悬停交互
+        document.querySelectorAll('.answer-sentence').forEach(sentence => {
+            sentence.addEventListener('mouseenter', function() {
+                const sourceId = this.dataset.source;
+
+                // 清除所有高亮
+                document.querySelectorAll('.source-doc').forEach(doc => {
+                    doc.classList.remove('highlight');
+                });
+
+                // 高亮对应源文档
+                if (sourceId && sourceId !== 'none') {
+                    const sourceDoc = document.getElementById(sourceId);
+                    if (sourceDoc) {
+                        sourceDoc.classList.add('highlight');
+                    }
+                }
+            });
+
+            sentence.addEventListener('mouseleave', function() {
+                document.querySelectorAll('.source-doc').forEach(doc => {
+                    doc.classList.remove('highlight');
+                });
+            });
+        });
+
+        // 评估指标计算器
+        function calculateMetrics() {
+            const tp = parseFloat(document.getElementById('tp').value) || 0;
+            const fp = parseFloat(document.getElementById('fp').value) || 0;
+            const fn = parseFloat(document.getElementById('fn').value) || 0;
+
+            // 验证输入
+            if (tp < 0 || fp < 0 || fn < 0) {
+                return;
+            }
+
+            // 计算 Recall = TP / (TP + FN)
+            const recall = tp + fn > 0 ? tp / (tp + fn) : 0;
+
+            // 计算 Precision = TP / (TP + FP)
+            const precision = tp + fp > 0 ? tp / (tp + fp) : 0;
+
+            // 计算 F1 = 2 * P * R / (P + R)
+            const f1 = precision + recall > 0 ? 2 * precision * recall / (precision + recall) : 0;
+
+            // 更新显示
+            document.getElementById('recallValue').textContent = recall.toFixed(2);
+            document.getElementById('precisionValue').textContent = precision.toFixed(2);
+            document.getElementById('f1Value').textContent = f1.toFixed(2);
+        }
+
+        // 初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            updateStep(1);
+        });
+    </script>
+</body>
+</html>

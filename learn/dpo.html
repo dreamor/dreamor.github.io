@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DPO - MiniMind 学习</title>
+    <link rel="stylesheet" href="styles/common.css">
+    <style>
+        .pref-pair { display:grid; grid-template-columns:1fr 1fr; gap:20px; margin:20px 0; }
+        .pref-box { background:#1a1a2e; padding:20px; border-radius:12px; position:relative; }
+        .pref-box.winner { border:2px solid #10b981; }
+        .pref-box.loser { border:2px solid #ef4444; }
+        .pref-badge { position:absolute; top:-10px; right:15px; padding:5px 15px; border-radius:20px; font-size:0.8em; font-weight:bold; }
+        .winner .pref-badge { background:#10b981; color:#000; }
+        .loser .pref-badge { background:#ef4444; color:#fff; }
+        .math-display { background:#21262d; padding:20px; border-radius:12px; text-align:center; margin:20px 0; }
+        .formula { color:#58a6ff; font-size:1.2em; font-family:monospace; }
+        .update-flow { display:flex; justify-content:center; gap:15px; margin:20px 0; flex-wrap:wrap; align-items:center; }
+        .update-step { background:#1a1a2e; padding:15px 20px; border-radius:10px; text-align:center; }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <a href="index.html" class="logo"><div class="logo-icon">🧠</div><span>MiniMind 学习</span></a>
+            <div class="nav-links">
+                <a href="index.html" class="nav-link">首页</a>
+                <a href="tokenization.html" class="nav-link">分词</a>
+                <a href="embedding.html" class="nav-link">词嵌入</a>
+                <a href="position.html" class="nav-link">位置编码</a>
+                <a href="attention.html" class="nav-link">注意力</a>
+                <a href="precision.html" class="nav-link">精度量化</a>
+                <a href="forward.html" class="nav-link">前馈网络</a>
+                <a href="model_architecture.html" class="nav-link">模型架构</a>
+                <a href="moe.html" class="nav-link">MoE</a>
+                <a href="pretrain.html" class="nav-link">预训练</a>
+                <a href="sft.html" class="nav-link">SFT</a>
+                <a href="lora.html" class="nav-link">LoRA</a>
+                <a href="dpo.html" class="nav-link active">DPO</a>
+                <a href="grpo.html" class="nav-link">GRPO</a>
+                <a href="inference.html" class="nav-link">推理</a>
+                
+                <a href="rag_retrieval.html" class="nav-link">RAG 检索</a>
+                <a href="rag_augment.html" class="nav-link">RAG 增强</a>
+                <a href="rag_generation.html" class="nav-link">RAG 生成</a>
+                <a href="rag_pipeline.html" class="nav-link">RAG 流程</a>
+                <a href="full_pipeline.html" class="nav-link" style="color: var(--accent);">全流程</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="page-header">
+            <h1 class="page-title">👍 DPO 偏好优化</h1>
+            <p class="page-subtitle">让模型学习"什么是更好的答案"</p>
+        </div>
+
+        <!-- SFT vs DPO vs GRPO 对比 -->
+        <div class="content-card">
+            <h3>🎯 SFT、DPO、GRPO 三者对比</h3>
+            <p>三者都是在预训练模型基础上微调，但学习方式和数据标签不同：</p>
+
+            <table class="compare-table" style="margin:20px 0;">
+                <thead><tr><th></th><th>SFT</th><th style="color:#00d4ff;">DPO</th><th>GRPO</th></tr></thead>
+                <tbody>
+                    <tr>
+                        <td><strong>本质</strong></td>
+                        <td>监督学习</td>
+                        <td style="color:#00d4ff;">偏好学习（离线）</td>
+                        <td>偏好学习（在线）</td>
+                    </tr>
+                    <tr>
+                        <td><strong>数据标签</strong></td>
+                        <td>标准答案</td>
+                        <td style="color:#00d4ff;">偏好排序（哪个更好）</td>
+                        <td>Reward 评分</td>
+                    </tr>
+                    <tr>
+                        <td><strong>数据来源</strong></td>
+                        <td>人工标注</td>
+                        <td style="color:#00d4ff;">人类标注/AI 反馈</td>
+                        <td>模型自己生成</td>
+                    </tr>
+                    <tr>
+                        <td><strong>训练阶段</strong></td>
+                        <td>SFT 之后</td>
+                        <td style="color:#00d4ff;">SFT 之后</td>
+                        <td>SFT 之后</td>
+                    </tr>
+                    <tr>
+                        <td><strong>典型应用</strong></td>
+                        <td>基础能力</td>
+                        <td style="color:#00d4ff;">对齐人类偏好</td>
+                        <td>数学/代码推理</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="concept-box">
+                <div class="concept-title">💡 通俗类比</div>
+                <p>SFT = 老师出题，学生抄答案，背答案</p>
+                <p style="color:#00d4ff;">DPO = 老师展示两份答案，学生判断哪个更好，反复练习好答案</p>
+                <p>GRPO = 学生自己写多份答案，自己批改认为最好的，反复练习最好的</p>
+            </div>
+        </div>
+
+        <!-- 为什么需要 DPO -->
+        <div class="content-card">
+            <h3>🎯 为什么需要 DPO？</h3>
+            <p>SFT 后模型已经能回答问题，但答案可能有高下之分：</p>
+
+            <div class="pref-pair">
+                <div class="pref-box loser">
+                    <div class="pref-badge">✗ 差答案</div>
+                    <p style="color:#ccc;">用户：今天天气怎么样？</p>
+                    <p style="color:#888;">答：还行。</p>
+                    <p style="color:#ef4444; margin-top:15px;">问题：太简短，没帮助</p>
+                </div>
+                <div class="pref-box winner">
+                    <div class="pref-badge">✓ 好答案</div>
+                    <p style="color:#ccc;">用户：今天天气怎么样？</p>
+                    <p style="color:#888;">答：今天天气很好，适合户外活动。预计最高温度 28℃，晴转多云。</p>
+                    <p style="color:#10b981; margin-top:15px;">优点：详细、有用</p>
+                </div>
+            </div>
+
+            <div class="concept-box">
+                <div class="concept-title">💡 DPO 的核心思想</div>
+                <p>不需要人工标注"正确答案是多少"，只需要比较两个答案，<strong>告诉模型哪个更好</strong></p>
+            </div>
+        </div>
+
+        <!-- DPO 数据格式 -->
+        <div class="content-card" style="border-left:4px solid #58a6ff;">
+            <h3>📋 DPO 数据格式</h3>
+            <p>每条训练数据包含：问题 + 好答案 + 差答案</p>
+
+            <div style="background:#21262d; padding:20px; border-radius:12px; margin:15px 0;">
+                <pre style="color:#58a6ff; font-size:0.85em;">
+{
+  <span class="string">"prompt"</span>: <span class="string">"今天天气怎么样？"</span>,
+  <span class="string">"chosen"</span>: <span class="string">"今天天气很好，适合户外活动..."</span>,   <span class="comment"># ✓ 好答案</span>
+  <span class="string">"rejected"</span>: <span class="string">"还行。"</span>                              <span class="comment"># ✗ 差答案</span>
+}
+                </pre>
+            </div>
+
+            <table class="compare-table">
+                <thead><tr><th>字段</th><th>含义</th><th>作用</th></tr></thead>
+                <tbody>
+                    <tr>
+                        <td>prompt</td>
+                        <td>用户问题</td>
+                        <td>输入给模型</td>
+                    </tr>
+                    <tr>
+                        <td>chosen</td>
+                        <td>人工标注的好答案</td>
+                        <td>目标输出</td>
+                    </tr>
+                    <tr>
+                        <td>rejected</td>
+                        <td>人工标注的差答案</td>
+                        <td>需要避免的输出</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- DPO 损失函数 -->
+        <div class="content-card" style="border-left:4px solid #10b981;">
+            <h3>📐 DPO 损失函数与参数更新</h3>
+
+            <div class="update-flow">
+                <div class="update-step" style="border-left:4px solid #58a6ff;">
+                    <div style="color:#58a6ff; font-weight:bold;">1. 计算偏好概率</div>
+                    <div style="color:#888; font-size:0.85em; margin-top:5px;">π(x)chosen vs π(x)rejected</div>
+                </div>
+                <div style="color:#888;">→</div>
+                <div class="update-step" style="border-left:4px solid #ffe66d;">
+                    <div style="color:#ffe66d; font-weight:bold;">2. 计算奖励差</div>
+                    <div style="color:#888; font-size:0.85em; margin-top:5px;">r = logπchosen - logπrejected</div>
+                </div>
+                <div style="color:#888;">→</div>
+                <div class="update-step" style="border-left:4px solid #10b981;">
+                    <div style="color:#10b981; font-weight:bold;">3. 梯度更新</div>
+                    <div style="color:#888; font-size:0.85em; margin-top:5px;">让 r 越来越大</div>
+                </div>
+            </div>
+
+            <div class="math-display">
+                <div class="formula">L = -log(σ(r_chosen - r_rejected))</div>
+                <p style="color:#888; margin-top:15px;">其中 r = log π(y)/π_ref(y) 是偏好奖励</p>
+            </div>
+
+            <div style="background:#21262d; padding:20px; border-radius:12px; margin-top:15px;">
+                <h4 style="color:#00d4ff; margin-bottom:15px;">📐 梯度更新详解</h4>
+                <p style="color:#ccc; margin-bottom:15px;">DPO 的梯度方向：增加选中答案的概率，降低拒绝答案的概率</p>
+
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:15px; margin-top:15px;">
+                    <div style="background:#1a1a2e; padding:15px; border-radius:8px;">
+                        <div style="color:#10b981; font-weight:bold;">如果 chosen 比 rejected 好</div>
+                        <p style="color:#888; margin-top:8px; font-size:0.9em;">r_chosen - r_rejected > 0<br>Loss 低，梯度小<br>参数只需小幅调整</p>
+                    </div>
+                    <div style="background:#1a1a2e; padding:15px; border-radius:8px;">
+                        <div style="color:#ff6b6b; font-weight:bold;">如果 chosen 比 rejected 差</div>
+                        <p style="color:#888; margin-top:8px; font-size:0.9em;">r_chosen - r_rejected < 0<br>Loss 高，梯度大<br>参数大幅更新，提高 chosen 概率</p>
+                    </div>
+                </div>
+            </div>
+
+            <div style="background:#1a1a2e; padding:20px; border-radius:8px; margin-top:15px;">
+                <p style="color:#888; margin-bottom:10px;">直观理解：</p>
+                <pre style="color:#58a6ff; font-size:0.85em;">
+<span class="comment"># DPO 希望 selected 的 reward 减去 rejected 的 reward 越来越大</span>
+diff = log_prob(chosen) - log_prob(rejected)
+
+<span class="comment"># Loss 高 → 梯度大 → 更新参数让 chosen 概率↑，rejected 概率↓</span>
+<span class="keyword">loss</span> = -log(sigmoid(diff))
+
+<span class="comment"># 梯度方向：增加选中答案概率，降低拒绝答案概率</span>
+grad = ∂Loss/∂θ = (reward_rejected - reward_chosen) × 更新方向
+                </pre>
+            </div>
+
+            <div style="background:#21262d; padding:20px; border-radius:12px; margin-top:15px;">
+                <h4 style="color:#ffe66d; margin-bottom:15px;">📐 DPO 梯度流向详解</h4>
+                <p style="color:#ccc; margin-bottom:15px;">DPO 的梯度同时作用在 chosen 和 rejected 上，但方向相反：</p>
+
+                <div style="background:#1a1a2e; padding:15px; border-radius:8px;">
+                    <p style="color:#10b981; margin-bottom:10px;">对 chosen 答案的梯度：</p>
+                    <pre style="color:#58a6ff; font-size:0.85em;">
+<span class="comment"># log π(y|x) 的梯度 = 提高chosen路径的激活程度</span>
+∇θ log πθ(chosen)  →  增大选中答案的概率
+                    </pre>
+                </div>
+
+                <div style="background:#1a1a2e; padding:15px; border-radius:8px; margin-top:10px;">
+                    <p style="color:#ff6b6b; margin-bottom:10px;">对 rejected 答案的梯度：</p>
+                    <pre style="color:#58a6ff; font-size:0.85em;">
+<span class="comment"># -∇θ log π(y|x) 的梯度 = 降低rejected路径的激活程度</span>
+-∇θ log πθ(rejected)  →  减小拒绝答案的概率
+                    </pre>
+                </div>
+
+                <p style="color:#888; margin-top:15px; font-size:0.9em;">
+                    两者相加：总梯度 = 提高chosen + 降低rejected = 拉开两者差距
+                </p>
+            </div>
+        </div>
+
+        <!-- 为什么有效 -->
+        <div class="content-card">
+            <h3>💡 DPO 为什么有效？</h3>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px; margin:20px 0;">
+                <div style="background:#1a1a2e; padding:20px; border-radius:12px;">
+                    <h4 style="color:#ef4444; margin-bottom:15px;">SFT 的问题</h4>
+                    <ul style="color:#ccc; line-height:2;">
+                        <li>只能学习"正确答案"</li>
+                        <li>无法区分"好的"和"差的"答案</li>
+                        <li>对同一个问题，只有一个标准答案</li>
+                    </ul>
+                </div>
+                <div style="background:#1a1a2e; padding:20px; border-radius:12px;">
+                    <h4 style="color:#10b981; margin-bottom:15px;">DPO 的优势</h4>
+                    <ul style="color:#ccc; line-height:2;">
+                        <li>通过比较学习"偏好"</li>
+                        <li>利用相对关系而非绝对标签</li>
+                        <li>信号更强：好 vs 差 的区别</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- 训练流程 -->
+        <div class="content-card" style="border-left:4px solid #ff6b6b;">
+            <h3>🔄 DPO 训练流程</h3>
+
+            <div style="background:#21262d; padding:20px; border-radius:12px;">
+                <pre style="color:#58a6ff; font-size:0.85em;">
+<span class="comment"># DPO 训练步骤</span>
+
+<span class="comment"># 1. 从 SFT 模型开始</span>
+policy_model = load_sft_model()
+ref_model = load_sft_model()  <span class="comment"># 参考模型（不更新）</span>
+
+<span class="comment"># 2. 对于每条数据 (prompt, chosen, rejected)</span>
+<span class="keyword">for</span> batch in dataloader:
+    prompt = batch[<span class="string">"prompt"</span>]
+    chosen = batch[<span class="string">"chosen"</span>]
+    rejected = batch[<span class="string">"rejected"</span>]
+
+    <span class="comment"># 3. 计算当前模型和参考模型的 log 概率</span>
+    log_pi_chosen = model(prompt + chosen).log_prob()
+    log_pi_rejected = model(prompt + rejected).log_prob()
+    log_ref_chosen = ref_model(prompt + chosen).log_prob()
+    log_ref_rejected = ref_model(prompt + rejected).log_prob()
+
+    <span class="comment"># 4. 计算偏好奖励 r = log(π/π_ref)</span>
+    r_chosen = log_pi_chosen - log_ref_chosen
+    r_rejected = log_pi_rejected - log_ref_rejected
+
+    <span class="comment"># 5. 计算 DPO Loss</span>
+    diff = r_chosen - r_rejected
+    <span class="keyword">loss</span> = -log(sigmoid(diff))
+
+    <span class="comment"># 6. 反向传播更新参数（默认全部参数，或只用 LoRA）</span>
+    loss.backward()
+    optimizer.step()
+                </pre>
+            </div>
+
+            <div class="concept-box" style="margin-top:20px;">
+                <div class="concept-title">💡 为什么需要参考模型 π_ref？</div>
+                <p>防止模型更新后偏离原始 SFT 太远，避免灾难性遗忘。参考模型是训练开始前的模型快照。</p>
+            </div>
+
+            <div style="background:#1a1a2e; padding:20px; border-radius:8px; margin-top:15px;">
+                <h4 style="color:#00d4ff; margin-bottom:15px;">🔍 KL 散度的直观理解</h4>
+                <p style="color:#ccc; margin-bottom:15px;">KL(π || π_ref) 衡量新模型 π 相对于参考模型 π_ref 的"偏离程度"：</p>
+
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:15px;">
+                    <div style="background:#21262d; padding:15px; border-radius:8px;">
+                        <p style="color:#10b981; font-weight:bold;">KL ≈ 0</p>
+                        <p style="color:#888; font-size:0.9em; margin-top:5px;">新模型和参考模型几乎一样</p>
+                    </div>
+                    <div style="background:#21262d; padding:15px; border-radius:8px;">
+                        <p style="color:#ff6b6b; font-weight:bold;">KL >> 0</p>
+                        <p style="color:#888; font-size:0.9em; margin-top:5px;">新模型严重偏离参考模型（可能出问题了）</p>
+                    </div>
+                </div>
+
+                <pre style="color:#58a6ff; font-size:0.85em; margin-top:15px;">
+<span class="comment"># KL 散度公式</span>
+KL(π || π_ref) = Σ π(y) × log(π(y) / π_ref(y))
+
+<span class="comment"># DPO 实际隐式地包含了 KL 约束</span>
+<span class="comment"># 因为 r = log(π/π_ref)，reward 已经包含了与参考模型的比较</span>
+                </pre>
+            </div>
+
+            <div style="background:#21262d; padding:20px; border-radius:12px; margin-top:15px;">
+                <h4 style="color:#ffe66d; margin-bottom:15px;">🔄 DPO vs GRPO：负样本的处理方式</h4>
+                <p style="color:#ccc; margin-bottom:15px;">DPO 和 GRPO 对"负样本"（差答案）的处理方式不同：</p>
+
+                <table class="compare-table">
+                    <thead><tr><th>方面</th><th>DPO</th><th>GRPO</th></tr></thead>
+                    <tbody>
+                        <tr>
+                            <td>负样本来源</td>
+                            <td>人工标注的 rejected 答案</td>
+                            <td>模型自己生成的低分答案</td>
+                        </tr>
+                        <tr>
+                            <td>负信号强度</td>
+                            <td>固定，取决于标注质量</td>
+                            <td>动态，取决于相对比较</td>
+                        </tr>
+                        <tr>
+                            <td>分布偏移风险</td>
+                            <td>较低（人类撰写）</td>
+                            <td>较高（模型自己生成）</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <p style="color:#888; margin-top:15px; font-size:0.9em;">
+                    DPO 的优势：rejected 答案是人类写的，分布更合理<br>
+                    GRPO 的优势：可以生成无限多对比，scalability 更好
+                </p>
+            </div>
+        </div>
+
+        <!-- 批量梯度更新 -->
+        <div class="content-card">
+            <h3>🔢 批量梯度更新机制</h3>
+            <p>所有方法（SFT/DPO/GRPO）都采用批量梯度下降：</p>
+
+            <div style="background:#1a1a2e; padding:20px; border-radius:12px; margin:15px 0;">
+                <pre style="color:#58a6ff; font-size:0.85em;">
+<span class="comment"># 三种方法都是这个模式</span>
+<span class="keyword">for</span> batch in dataset:           <span class="comment"># 每次取一批数据</span>
+    loss = compute_loss(batch)        <span class="comment"># 计算损失</span>
+    loss.backward()                   <span class="comment"># 反向传播</span>
+    optimizer.step()                  <span class="comment"># 更新参数</span>
+                </pre>
+            </div>
+
+            <div class="concept-box">
+                <div class="concept-title">💡 使用 LoRA 时的区别</div>
+                <p>默认更新全部参数；用 LoRA 时只更新 A、B 矩阵：</p>
+                <ul style="color:#ccc; margin:10px 0; padding-left:20px; line-height:1.8;">
+                    <li><strong>全参数微调</strong>：W, A, B 全部更新</li>
+                    <li><strong>LoRA 微调</strong>：只有 A 和 B 矩阵更新，原始 W 冻结</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- 总结 -->
+        <div class="content-card" style="text-align:center;">
+            <h3>📝 总结</h3>
+            <p style="font-size:1.2em; color:#00d4ff; margin:20px 0;">
+                DPO = 比较学习，让模型知道"哪个答案更好"
+            </p>
+
+            <div style="background:#21262d; padding:20px; border-radius:12px; text-align:left; margin:20px auto; max-width:600px;">
+                <h4 style="color:#ffe66d; margin-bottom:15px;">🎯 DPO 关键点：</h4>
+                <ul style="color:#ccc; line-height:2;">
+                    <li><strong>数据形式</strong>：(问题, 好答案, 差答案) 三元组</li>
+                    <li><strong>训练目标</strong>：最大化好答案 vs 差答案的概率差</li>
+                    <li><strong>梯度方向</strong>：提高偏好答案概率，降低拒绝答案概率</li>
+                    <li><strong>参考模型</strong>：防止灾难性遗忘</li>
+                    <li><strong>训练稳定</strong>：不需要复杂的 RL 算法</li>
+                </ul>
+            </div>
+
+            <div class="btn-group">
+                <a href="lora.html" class="btn btn-secondary">← 上一课：LoRA</a>
+                <a href="grpo.html" class="btn btn-primary">下一课：GRPO →</a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>模型精度与量化 - MiniMind 学习</title>
+    <link rel="stylesheet" href="styles/common.css">
+    <style>
+        /* 精度页面特定样式 */
+        .precision-comparison {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            margin: 30px 0;
+            flex-wrap: wrap;
+        }
+
+        .precision-card {
+            background: #1a1a2e;
+            border-radius: 16px;
+            padding: 25px;
+            text-align: center;
+            min-width: 150px;
+            border: 2px solid transparent;
+            transition: all 0.3s;
+        }
+
+        .precision-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .precision-card.fp32 { border-color: #4ecdc4; }
+        .precision-card.fp16 { border-color: #ffe66d; }
+        .precision-card.int8 { border-color: #ff6b6b; }
+        .precision-card.int4 { border-color: #a371f7; }
+
+        .precision-value {
+            font-size: 2.5em;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        .precision-card.fp32 .precision-value { color: #4ecdc4; }
+        .precision-card.fp16 .precision-value { color: #ffe66d; }
+        .precision-card.int8 .precision-value { color: #ff6b6b; }
+        .precision-card.int4 .precision-value { color: #a371f7; }
+
+        .precision-bits {
+            background: #21262d;
+            padding: 8px 16px;
+            border-radius: 20px;
+            display: inline-block;
+            margin: 10px 0;
+        }
+
+        .storage-bar {
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            gap: 20px;
+            height: 150px;
+            margin: 30px 0;
+        }
+
+        .storage-col {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .storage-bar-item {
+            width: 60px;
+            border-radius: 8px 8px 0 0;
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            padding-bottom: 10px;
+            color: #fff;
+            font-weight: bold;
+            transition: all 0.5s;
+        }
+
+        .visual-demo {
+            background: #0d1117;
+            border-radius: 12px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+
+        .number-compare {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 30px;
+            flex-wrap: wrap;
+            margin: 20px 0;
+        }
+
+        .num-group {
+            text-align: center;
+            padding: 15px;
+            border-radius: 12px;
+            min-width: 120px;
+        }
+
+        .num-group.highprec {
+            background: rgba(78, 205, 196, 0.1);
+            border: 1px solid #4ecdc4;
+        }
+
+        .num-group.lowprec {
+            background: rgba(255, 107, 107, 0.1);
+            border: 1px solid #ff6b6b;
+        }
+
+        .num-value {
+            font-size: 2em;
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+        }
+
+        .num-group.highprec .num-value { color: #4ecdc4; }
+        .num-group.lowprec .num-value { color: #ff6b6b; }
+
+        .arrow-compare {
+            font-size: 2em;
+            color: #58a6ff;
+        }
+
+        .quantize-steps {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            align-items: center;
+            margin: 25px 0;
+            flex-wrap: wrap;
+        }
+
+        .q-step {
+            background: #21262d;
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+            min-width: 100px;
+        }
+
+        .q-step-arrow {
+            font-size: 2em;
+            color: #58a6ff;
+        }
+
+        .formula-box {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            margin: 20px 0;
+        }
+
+        .formula-text {
+            font-family: 'Courier New', monospace;
+            font-size: 1.2em;
+            color: #79c0ff;
+        }
+
+        .heatmap-comparison {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin: 20px 0;
+        }
+
+        .heatmap-section {
+            text-align: center;
+        }
+
+        .heatmap-title {
+            margin-bottom: 15px;
+            color: #8b949e;
+        }
+    </style>
+</head>
+<body>
+    <!-- 导航栏 -->
+    <nav class="navbar">
+        <div class="container">
+            <a href="index.html" class="logo">
+                <div class="logo-icon">🧠</div>
+                <span>MiniMind 学习</span>
+            </a>
+            <div class="nav-links">
+                <a href="index.html" class="nav-link">首页</a>
+                <a href="tokenization.html" class="nav-link">分词</a>
+                <a href="embedding.html" class="nav-link">词嵌入</a>
+                <a href="position.html" class="nav-link">位置编码</a>
+                <a href="attention.html" class="nav-link">注意力</a>
+                <a href="precision.html" class="nav-link active">精度量化</a>
+                <a href="forward.html" class="nav-link">前馈网络</a>
+                <a href="model_architecture.html" class="nav-link">模型架构</a>
+                <a href="moe.html" class="nav-link">MoE</a>
+                <a href="pretrain.html" class="nav-link">预训练</a>
+                <a href="sft.html" class="nav-link">SFT</a>
+                <a href="lora.html" class="nav-link">LoRA</a>
+                <a href="dpo.html" class="nav-link">DPO</a>
+                <a href="grpo.html" class="nav-link">GRPO</a>
+                <a href="inference.html" class="nav-link">推理</a>
+                
+                <a href="rag_retrieval.html" class="nav-link">RAG 检索</a>
+                <a href="rag_augment.html" class="nav-link">RAG 增强</a>
+                <a href="rag_generation.html" class="nav-link">RAG 生成</a>
+                <a href="rag_pipeline.html" class="nav-link">RAG 流程</a>
+                <a href="full_pipeline.html" class="nav-link" style="color: var(--accent);">全流程</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <!-- 页面标题 -->
+        <div class="page-header">
+            <h1 class="page-title">📐 模型精度与量化</h1>
+            <p class="page-subtitle">为什么有时用 32 位，有时用 8 位？</p>
+        </div>
+
+        <!-- 什么是精度 -->
+        <div class="content-card">
+            <h3>🎯 什么是模型精度？</h3>
+            <p>模型权重本质上是一个<strong>多维向量</strong>，每个维度上的值需要用一定的位数来存储，这就是"精度"。</p>
+
+            <div class="precision-comparison">
+                <div class="precision-card fp32">
+                    <div class="precision-value">FP32</div>
+                    <div class="precision-bits">32 位</div>
+                    <p style="color:#888;">单精度浮点</p>
+                    <p style="font-size:0.9em; color:#aaa;">范围: ±3.4×10³⁸</p>
+                </div>
+                <div class="precision-card fp16">
+                    <div class="precision-value">FP16</div>
+                    <div class="precision-bits">16 位</div>
+                    <p style="color:#888;">半精度浮点</p>
+                    <p style="font-size:0.9em; color:#aaa;">范围: ±65504</p>
+                </div>
+                <div class="precision-card int8">
+                    <div class="precision-value">INT8</div>
+                    <div class="precision-bits">8 位</div>
+                    <p style="color:#888;">8位整数</p>
+                    <p style="font-size:0.9em; color:#aaa;">范围: -128 ~ 127</p>
+                </div>
+                <div class="precision-card int4">
+                    <div class="precision-value">INT4</div>
+                    <div class="precision-bits">4 位</div>
+                    <p style="color:#888;">4位整数</p>
+                    <p style="font-size:0.9em; color:#aaa;">范围: -8 ~ 7</p>
+                </div>
+            </div>
+
+            <div class="concept-box">
+                <div class="concept-title">💡 类比：称重量</div>
+                <p>
+                    <strong>FP32</strong> = 用精密天平（精确到 0.0001 克）<br>
+                    <strong>FP16</strong> = 用普通秤（精确到 0.01 克）<br>
+                    <strong>INT8</strong> = 用弹簧秤（精确到 1 克）<br>
+                    <strong>INT4</strong> = 用天平砝码（只能精确到 5 克）
+                </p>
+            </div>
+        </div>
+
+        <!-- 精度对比可视化 -->
+        <div class="content-card">
+            <h3>🔍 同一个数的不同精度</h3>
+
+            <div class="number-compare">
+                <div class="num-group highprec">
+                    <div class="num-title" style="color:#888; margin-bottom:10px;">FP32 (32位)</div>
+                    <div class="num-value">0.123456789</div>
+                    <div style="color:#4ecdc4; font-size:0.9em;">更多小数位</div>
+                </div>
+                <div class="arrow-compare">→</div>
+                <div class="num-group highprec">
+                    <div class="num-title" style="color:#888; margin-bottom:10px;">FP16 (16位)</div>
+                    <div class="num-value">0.1234</div>
+                    <div style="color:#4ecdc4; font-size:0.9em;">取前几位</div>
+                </div>
+                <div class="arrow-compare">→</div>
+                <div class="num-group lowprec">
+                    <div class="num-title" style="color:#888; margin-bottom:10px;">INT8 (8位)</div>
+                    <div class="num-value">12</div>
+                    <div style="color:#ff6b6b; font-size:0.9em;">缩放后取整</div>
+                </div>
+                <div class="arrow-compare">→</div>
+                <div class="num-group lowprec">
+                    <div class="num-title" style="color:#888; margin-bottom:10px;">INT4 (4位)</div>
+                    <div class="num-value">1</div>
+                    <div style="color:#ff6b6b; font-size:0.9em;">更粗粒度</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 存储对比 -->
+        <div class="content-card">
+            <h3>💾 显存占用对比</h3>
+            <p>以 7B 参数模型为例：</p>
+
+            <div class="storage-bar">
+                <div class="storage-col">
+                    <div class="storage-bar-item" style="height:140px; background: linear-gradient(to top, #4ecdc4, #3dbdb5);">
+                        28GB
+                    </div>
+                    <div>FP32</div>
+                </div>
+                <div class="storage-col">
+                    <div class="storage-bar-item" style="height:70px; background: linear-gradient(to top, #ffe66d, #ffd33d);">
+                        14GB
+                    </div>
+                    <div>FP16</div>
+                </div>
+                <div class="storage-col">
+                    <div class="storage-bar-item" style="height:35px; background: linear-gradient(to top, #ff6b6b, #ee5a5a);">
+                        7GB
+                    </div>
+                    <div>INT8</div>
+                </div>
+                <div class="storage-col">
+                    <div class="storage-bar-item" style="height:18px; background: linear-gradient(to top, #a371f7, #8957e5);">
+                        3.5GB
+                    </div>
+                    <div>INT4</div>
+                </div>
+            </div>
+
+            <p style="text-align:center; color:#888;">
+                从 FP32 到 INT4，显存占用减少 <strong style="color:#a371f7;">87.5%</strong>！
+            </p>
+        </div>
+
+        <!-- 量化原理 -->
+        <div class="content-card">
+            <h3>⚡ 量化原理</h3>
+            <p>量化的核心是把高精度转换为低精度，同时<strong>保留相对关系</strong>。</p>
+
+            <div class="quantize-steps">
+                <div class="q-step">
+                    <div style="color:#4ecdc4; font-weight:bold; margin-bottom:10px;">① 收集范围</div>
+                    <p style="color:#888; font-size:0.9em;">找出权重最大值</p>
+                    <p style="color:#fff;">max = 3.5</p>
+                </div>
+                <div class="q-step-arrow">→</div>
+                <div class="q-step">
+                    <div style="color:#ffe66d; font-weight:bold; margin-bottom:10px;">② 计算 Scale</div>
+                    <p style="color:#888; font-size:0.9em;">缩放因子</p>
+                    <p style="color:#fff;">scale = 127 / 3.5</p>
+                    <p style="color:#fff;">= 36.3</p>
+                </div>
+                <div class="q-step-arrow">→</div>
+                <div class="q-step">
+                    <div style="color:#ff6b6b; font-weight:bold; margin-bottom:10px;">③ 量化</div>
+                    <p style="color:#888; font-size:0.9em;">转成整数</p>
+                    <p style="color:#fff;">round(0.5 × 36.3)</p>
+                    <p style="color:#fff;">= 18</p>
+                </div>
+                <div class="q-step-arrow">→</div>
+                <div class="q-step">
+                    <div style="color:#a371f7; font-weight:bold; margin-bottom:10px;">④ 反量化</div>
+                    <p style="color:#888; font-size:0.9em;">使用时复原</p>
+                    <p style="color:#fff;">18 / 36.3</p>
+                    <p style="color:#fff;">≈ 0.496</p>
+                </div>
+            </div>
+
+            <div class="formula-box">
+                <div class="formula-text">量化: q = round(x / scale)</div>
+                <div class="formula-text" style="margin-top:10px;">反量化: x ≈ q × scale</div>
+            </div>
+        </div>
+
+        <!-- 为什么量化影响小 -->
+        <div class="content-card">
+            <h3>❓ 为什么量化对模型影响不大？</h3>
+
+            <div class="heatmap-comparison">
+                <div class="heatmap-section">
+                    <div class="heatmap-title">原始分布 (FP32)</div>
+                    <div style="display:flex; justify-content:center; gap:5px; height:60px; align-items:flex-end;">
+                        <div style="width:30px; height:30px; background:#4ecdc4; border-radius:4px;"></div>
+                        <div style="width:30px; height:50px; background:#4ecdc4; border-radius:4px;"></div>
+                        <div style="width:30px; height:40px; background:#4ecdc4; border-radius:4px;"></div>
+                        <div style="width:30px; height:60px; background:#4ecdc4; border-radius:4px;"></div>
+                        <div style="width:30px; height:45px; background:#4ecdc4; border-radius:4px;"></div>
+                    </div>
+                    <p style="color:#888; font-size:0.9em; margin-top:10px;">相对大小保持</p>
+                </div>
+                <div class="heatmap-section">
+                    <div class="heatmap-title">量化后分布 (INT8)</div>
+                    <div style="display:flex; justify-content:center; gap:5px; height:60px; align-items:flex-end;">
+                        <div style="width:30px; height:30px; background:#ff6b6b; border-radius:4px;"></div>
+                        <div style="width:30px; height:50px; background:#ff6b6b; border-radius:4px;"></div>
+                        <div style="width:30px; height:40px; background:#ff6b6b; border-radius:4px;"></div>
+                        <div style="width:30px; height:60px; background:#ff6b6b; border-radius:4px;"></div>
+                        <div style="width:30px; height:45px; background:#ff6b6b; border-radius:4px;"></div>
+                    </div>
+                    <p style="color:#888; font-size:0.9em; margin-top:10px;">分布形状不变</p>
+                </div>
+            </div>
+
+            <div class="concept-box">
+                <div class="concept-title">🔑 关键洞察：保留相对关系</div>
+                <p>
+                    <strong>模型关心的是"谁更大"，而不是"具体多少"。</strong><br><br>
+                    例：原始 [0.12, 0.09, 0.06] → 最大是 0.12<br>
+                    量化后 [48, 36, 24]（按比例）→ 最大也是 48<br><br>
+                    只要相对顺序不变，模型表现就不受大影响！
+                </p>
+            </div>
+        </div>
+
+        <!-- 量化方法对比 -->
+        <div class="content-card">
+            <h3>📊 量化方法对比</h3>
+
+            <table class="compare-table">
+                <thead>
+                    <tr>
+                        <th>方法</th>
+                        <th>精度损失</th>
+                        <th>实现难度</th>
+                        <th>适用场景</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>PTQ (训练后量化)</td>
+                        <td style="color:#ffe66d;">~1-2%</td>
+                        <td style="color:#4ecdc4;">简单</td>
+                        <td>推理加速，首选</td>
+                    </tr>
+                    <tr>
+                        <td>QAT (量化感知训练)</td>
+                        <td style="color:#4ecdc4;">~0.5%</td>
+                        <td style="color:#ffe66d;">中等</td>
+                        <td>对精度要求高</td>
+                    </tr>
+                    <tr>
+                        <td>动态量化</td>
+                        <td style="color:#ffe66d;">~2%</td>
+                        <td style="color:#4ecdc4;">最简单</td>
+                        <td>快速部署</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- 总结 -->
+        <div class="content-card" style="text-align: center;">
+            <h3>📝 总结</h3>
+            <p style="font-size:1.2em; color:#00d4ff; margin:20px 0;">
+                精度 = 存储每个权重用多少位<br>
+                量化 = 高精度转低精度，保留相对关系
+            </p>
+            <p style="color:#888;">
+                主流模型已全面采用 FP16/BF16 训练，推理时常用 INT8/INT4
+            </p>
+            <div class="btn-group">
+                <a href="attention.html" class="btn btn-secondary">← 上一课：注意力</a>
+                <a href="forward.html" class="btn btn-primary">下一课：前馈网络 →</a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 页面加载动画
+        document.addEventListener('DOMContentLoaded', () => {
+            const cards = document.querySelectorAll('.content-card');
+            cards.forEach((card, index) => {
+                card.style.opacity = '0';
+                card.style.transform = 'translateY(20px)';
+                setTimeout(() => {
+                    card.style.transition = 'all 0.5s ease';
+                    card.style.opacity = '1';
+                    card.style.transform = 'translateY(0)';
+                }, index * 150);
+            });
+        });
+    </script>
+</body>
+</html>
