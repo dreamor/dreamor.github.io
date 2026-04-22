@@ -1,10 +1,8 @@
 # MiniMind 大模型交互式学习网站
 
-一个完全从零开始、通过交互式动画和图解帮助理解大语言模型原理的教程网站。
+> 🌐 网站地址: https://dreamor.github.io
 
-## 概述
-
-这个项目包含一系列交互式网页教程，涵盖了从基础概念到训练推理的完整流程。无论你是 AI 初学者还是有经验的开发者，都能通过这些可视化教程深入理解大模型的工作原理。
+一个通过交互式动画和图解帮助理解大语言模型原理的教程网站。
 
 ## 学习路径
 
@@ -18,54 +16,37 @@
 🔮 推理
 ```
 
-## 包含的教程
+## 教程内容
 
 ### 基础概念
-| 文件 | 主题 | 描述 |
-|------|------|------|
-| `tokenization.html` | 分词 | BPE 算法原理演示 |
-| `embedding.html` | 词嵌入 | 查表操作与向量可视化 |
-| `position.html` | 位置编码 (RoPE) | 旋转编码动画 |
-| `attention.html` | 注意力机制 | QKV 四步计算动画 |
-| `precision.html` | 精度与量化 | FP32/FP16/INT8 对比 |
-| `forward.html` | 前馈网络 (FFN) | SwiGLU 激活详解 |
+- **分词** (`tokenization.html`) - BPE 算法原理演示
+- **词嵌入** (`embedding.html`) - 查表操作与向量可视化
+- **位置编码** (`position.html`) - RoPE 旋转编码动画
+- **注意力机制** (`attention.html`) - QKV 四步计算动画
+- **精度与量化** (`precision.html`) - FP32/FP16/INT8 对比
+- **前馈网络** (`forward.html`) - SwiGLU 激活详解
 
 ### 模型架构
-| 文件 | 主题 | 描述 |
-|------|------|------|
-| `model_architecture.html` | 模型整体架构 | Transformer 堆叠 |
-| `moe.html` | MoE | 混合专家机制 |
+- **模型架构** (`model_architecture.html`) - Transformer 堆叠
+- **MoE** (`moe.html`) - 混合专家机制
 
 ### 训练流程
-| 文件 | 主题 | 描述 |
-|------|------|------|
-| `pretrain.html` | 预训练 | 完形填空任务 |
-| `sft.html` | SFT (监督微调) | 指令微调 |
-| `lora.html` | LoRA | 高效微调技术 |
-| `dpo.html` | DPO | 偏好优化 |
-| `grpo.html` | GRPO | 强化学习 |
+- **预训练** (`pretrain.html`) - 完形填空任务
+- **SFT** (`sft.html`) - 监督微调
+- **LoRA** (`lora.html`) - 高效微调技术
+- **DPO** (`dpo.html`) - 偏好优化
+- **GRPO** (`grpo.html`) - 强化学习
 
 ### 推理流程
-| 文件 | 主题 | 描述 |
-|------|------|------|
-| `inference.html` | 推理流程 | KV Cache 加速与自回归生成 |
-| `full_pipeline.html` | 全流程动画 | 交互式数据流演示，覆盖推理/训练全流程 |
+- **推理** (`inference.html`) - KV Cache 加速与自回归生成
+- **全流程动画** (`full_pipeline.html`) - 交互式数据流演示
 
-## 全流程动画
-
-`full_pipeline.html` 提供交互式动画演示：
-
-- **推理模式**：展示用户输入 → 分词 → 词嵌入 → 位置编码 → 注意力 → FFN → 输出的完整数据流
-- **训练模式**：展示预训练/SFT/DPO/GRPO 各阶段的训练过程（语料→前向传播→Loss→反向传播→权重更新）
-- 支持播放/暂停/步进控制，可观察数据块在模块间的流动
-
-## 快速开始
-
-### 本地运行
+## 本地运行
 
 ```bash
-# 进入 learn 目录
-cd learn
+# 克隆仓库
+git clone https://github.com/dreamor/dreamor.github.io.git
+cd dreamor.github.io
 
 # 启动本地服务器
 python3 -m http.server 8080
@@ -74,22 +55,12 @@ python3 -m http.server 8080
 open http://localhost:8080
 ```
 
-### 在线访问
-
-直接用浏览器打开任意 `.html` 文件即可查看本地版本。
-
 ## 项目特点
 
-- **交互式动画** - 关键概念配有动画演示，帮助直观理解
-- **通俗易懂** - 用生活化的类比解释专业概念
-- **代码示例** - 每个概念都配有 PyTorch 代码实现
-- **完整流程** - 从理论到实战，涵盖训练、调优、推理全流程
-
-## 技术栈
-
-- HTML5 + CSS3
-- Vanilla JavaScript
-- 无需任何框架，纯静态页面
+- 🎬 **交互式动画** - 关键概念配有动画演示
+- 📖 **通俗易懂** - 生活化类比解释专业概念
+- 💻 **代码示例** - PyTorch 代码实现
+- 🔄 **完整流程** - 训练、调优、推理全覆盖
 
 ## 相关项目
 
@@ -98,7 +69,3 @@ open http://localhost:8080
 ## 许可证
 
 MIT License
-
----
-
-💡 建议按顺序学习，从分词开始，逐步深入到训练和推理流程。
